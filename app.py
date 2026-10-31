@@ -11,6 +11,10 @@ st.set_page_config(
 )
 
 st.title("Chennai Local Body Election 2027")
+st.caption(
+    "A ward-wise dashboard for historical election analysis "
+    "and public opinion polling across Chennai's 200 wards."
+)
 st.subheader("Ward-wise Election Analysis Dashboard")
 
 data = pd.read_csv("chennai_complete_2022.csv")
