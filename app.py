@@ -123,7 +123,7 @@ try:
 
     st.metric("Responses in Selected Ward", len(ward_poll))
     st.bar_chart(ward_results)
-        st.write("### Ward-wise Party Comparison")
+    st.write("### Ward-wise Party Comparison")
 
     ward_comparison = poll.pivot_table(
         index="ward",
