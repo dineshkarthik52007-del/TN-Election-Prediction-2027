@@ -1,9 +1,9 @@
-import requests
 import streamlit as st
 import pandas as pd
-import os
+import requests
+
 SUPABASE_URL = "https://xkiaxjhifmnsxthxkwlk.supabase.co"
-SUPABASE_KEY = "YOUR_PUBLISHABLE_KEY"
+SUPABASE_KEY = "sb_publishable__WT7GeEGizjxAKilJEQjhg_LbjejXtq"
 
 st.set_page_config(
     page_title="Chennai Election Analysis 2027",
@@ -21,6 +21,12 @@ party_columns = {
     "DMK": "தி.மு.க",
     "AIADMK": "அ.இ.அ.தி.மு.க",
     "NTK": "நா.த.க."
+}
+
+headers = {
+    "apikey": SUPABASE_KEY,
+    "Authorization": "Bearer " + SUPABASE_KEY,
+    "Content-Type": "application/json"
 }
 
 st.info(
@@ -42,49 +48,84 @@ historical = {}
 for party, column in party_columns.items():
     historical[party] = selected[column]
 
-historical_chart = pd.Series(historical)
-st.bar_chart(historical_chart)
+st.bar_chart(pd.Series(historical))
 
-st.caption("TVK did not contest in 2022, so its historical vote share is unavailable.")
+st.caption(
+    "TVK did not contest in 2022, so its historical vote share is unavailable."
+)
 
 st.divider()
 
 st.write("## Current Public Opinion Poll")
 
-poll_file = "poll/ward_responses.csv"
+with st.form("public_poll"):
+    st.write(
+        "If the election were held today, which party would you support?"
+    )
 
-if os.path.exists(poll_file):
+    party = st.radio("Select your preferred party", parties)
 
-    poll = pd.read_csv(poll_file)
+    st.write("Selected Ward:", int(ward))
 
-    if "ward" in poll.columns:
+    submit = st.form_submit_button("Submit Vote")
 
-        ward_name = "Ward " + str(int(ward))
+    if submit:
+        vote = {
+            "party": party,
+            "ward": int(ward)
+        }
 
-        ward_poll = poll[poll["ward"] == ward_name]
+        try:
+            response = requests.post(
+                SUPABASE_URL + "/rest/v1/poll_responses",
+                headers=headers,
+                json=vote
+            )
 
-        poll_results = ward_poll["party"].value_counts().reindex(
-            parties, fill_value=0
-        )
+            if response.status_code in [200, 201, 204]:
+                st.success("Your response has been recorded!")
+            else:
+                st.error("Unable to submit vote: " + response.text)
 
-        total = len(ward_poll)
+        except Exception as e:
+            st.error("Connection error: " + str(e))
 
-        st.metric("Poll Responses in Selected Ward", total)
+st.write("### Four-Party Poll Comparison")
 
-        st.write("### Four-Party Poll Comparison")
-        st.bar_chart(poll_results)
+try:
+    response = requests.get(
+        SUPABASE_URL + "/rest/v1/poll_responses",
+        headers=headers,
+        params={"select": "party,ward", "limit": "10000"}
+    )
 
-        st.write("### Poll Response Count")
+    response.raise_for_status()
 
-        st.dataframe(
-            poll_results.rename("Responses").reset_index()
-        )
+    poll = pd.DataFrame(
+        response.json(),
+        columns=["party", "ward"]
+    )
 
-    else:
-        st.warning("No ward information found in poll data.")
+    results = poll["party"].value_counts().reindex(
+        parties, fill_value=0
+    )
 
-else:
-    st.info("No poll responses collected yet.")
+    st.metric("Total Poll Responses", len(poll))
+    st.bar_chart(results)
+
+    st.write("### Selected Ward Results")
+
+    ward_poll = poll[poll["ward"] == int(ward)]
+
+    ward_results = ward_poll["party"].value_counts().reindex(
+        parties, fill_value=0
+    )
+
+    st.metric("Responses in Selected Ward", len(ward_poll))
+    st.bar_chart(ward_results)
+
+except Exception as e:
+    st.error("Unable to load poll results: " + str(e))
 
 st.divider()
 
