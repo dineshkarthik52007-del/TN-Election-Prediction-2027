@@ -116,6 +116,10 @@ try:
     leading_party = results.idxmax() if len(poll) > 0 else "No responses"
     st.metric("Overall Leading Party", leading_party)
     st.bar_chart(results)
+    if len(poll) > 0:
+        percentages = (results / len(poll)) * 100
+        st.write("### Party-wise Poll Percentage")
+        st.bar_chart(percentages)
 
     st.write("### Selected Ward Results")
 
