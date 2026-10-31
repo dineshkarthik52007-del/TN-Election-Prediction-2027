@@ -11,7 +11,7 @@ st.set_page_config(
 st.title("Chennai Local Body Election 2027")
 st.subheader("Ward-wise Election Analysis Dashboard")
 
-data = pd.read_csv("data/chennai_complete_2022.csv")
+data = pd.read_csv("chennai_complete_2022.csv")
 
 parties = ["TVK", "DMK", "AIADMK", "NTK"]
 
