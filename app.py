@@ -123,6 +123,21 @@ try:
 
     st.metric("Responses in Selected Ward", len(ward_poll))
     st.bar_chart(ward_results)
+        st.write("### Ward-wise Party Comparison")
+
+    ward_comparison = poll.pivot_table(
+        index="ward",
+        columns="party",
+        aggfunc="size",
+        fill_value=0
+    )
+
+    ward_comparison = ward_comparison.reindex(
+        columns=parties,
+        fill_value=0
+    ).sort_index()
+
+    st.bar_chart(ward_comparison)
 
 except Exception as e:
     st.error("Unable to load poll results: " + str(e))
