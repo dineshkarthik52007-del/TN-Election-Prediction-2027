@@ -111,6 +111,10 @@ try:
     )
 
     st.metric("Total Poll Responses", len(poll))
+    st.metric("Wards with Responses", poll["ward"].nunique())
+
+    leading_party = results.idxmax() if len(poll) > 0 else "No responses"
+    st.metric("Overall Leading Party", leading_party)
     st.bar_chart(results)
 
     st.write("### Selected Ward Results")
