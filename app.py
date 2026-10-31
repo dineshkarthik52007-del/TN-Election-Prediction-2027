@@ -1,7 +1,9 @@
-
+import requests
 import streamlit as st
 import pandas as pd
 import os
+SUPABASE_URL = "https://xkiaxjhifmnsxthxkwlk.supabase.co"
+SUPABASE_KEY = "YOUR_PUBLISHABLE_KEY"
 
 st.set_page_config(
     page_title="Chennai Election Analysis 2027",
