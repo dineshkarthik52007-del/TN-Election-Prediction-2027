@@ -138,6 +138,14 @@ try:
     ).sort_index()
 
     st.bar_chart(ward_comparison)
+    st.write("### Leading Party in Each Ward")
+
+    leading_results = pd.DataFrame({
+        "Leading Party": ward_comparison.idxmax(axis=1),
+        "Poll Responses": ward_comparison.max(axis=1)
+    })
+
+    st.dataframe(leading_results, use_container_width=True)
 
 except Exception as e:
     st.error("Unable to load poll results: " + str(e))
