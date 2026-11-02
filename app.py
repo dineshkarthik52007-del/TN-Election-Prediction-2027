@@ -18,6 +18,7 @@ st.caption(
 st.subheader("Ward-wise Election Analysis Dashboard")
 
 data = pd.read_csv("chennai_complete_2022.csv")
+st.write("Dataset Columns:", data.columns.tolist())
 
 parties = ["TVK", "DMK", "AIADMK", "NTK"]
 
