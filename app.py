@@ -2,6 +2,8 @@ import streamlit as st
 import pandas as pd
 import requests
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score
 SUPABASE_URL = "https://xkiaxjhifmnsxthxkwlk.supabase.co"
 SUPABASE_KEY = "sb_publishable__WT7GeEGizjxAKilJEQjhg_LbjejXtq"
 
@@ -18,6 +20,43 @@ st.caption(
 st.subheader("Ward-wise Election Analysis Dashboard")
 
 data = pd.read_csv("chennai_complete_2022.csv")
+ml_features = [
+    "electors",
+    "polled",
+    "polled_pct",
+    "valid_votes",
+    "candidates"
+]
+
+ml_data = data[ml_features + ["winner_party_ta"]].copy()
+
+for column in ml_features:
+    ml_data[column] = pd.to_numeric(
+        ml_data[column], errors="coerce"
+    )
+
+ml_data = ml_data.dropna()
+
+X = ml_data[ml_features]
+y = ml_data["winner_party_ta"]
+
+X_train, X_test, y_train, y_test = train_test_split(
+    X,
+    y,
+    test_size=0.2,
+    random_state=42
+)
+
+model = RandomForestClassifier(
+    n_estimators=100,
+    random_state=42
+)
+
+model.fit(X_train, y_train)
+
+predictions = model.predict(X_test)
+
+accuracy = accuracy_score(y_test, predictions)
 
 
 parties = ["TVK", "DMK", "AIADMK", "NTK"]
@@ -221,4 +260,26 @@ st.dataframe(
 st.caption(
     "Public opinion poll responses are voluntary and are not "
     "representative election forecasts."
+)
+st.divider()
+
+st.write("## Random Forest Model - Historical Test Results")
+
+majority_baseline = y_test.value_counts(normalize=True).max() * 100
+
+st.metric("Historical Test Accuracy", f"{accuracy * 100:.2f}%")
+st.metric("Majority-Class Baseline", f"{majority_baseline:.2f}%")
+
+st.write("### Actual vs Predicted Historical Winners")
+
+comparison = pd.DataFrame({
+    "Actual Winner": y_test.values,
+    "Predicted Winner": predictions
+})
+
+st.dataframe(comparison, use_container_width=True)
+
+st.caption(
+    "This test measures classification of held-out 2022 wards only. "
+    "It does not measure or guarantee 2027 election prediction accuracy."
 )
