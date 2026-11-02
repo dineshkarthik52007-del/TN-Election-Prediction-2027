@@ -7,9 +7,10 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
 from prediction_model import build_prediction_model
+from ml_prediction_model import build_ml_predictions
 
 SUPABASE_URL = "https://xkiaxjhifmnsxthxkwlk.supabase.co"
-SUPABASE_KEY = "sb_publishable__WT7GeEGizjxAKilJEQjhg_LbjejXtq"
+SUPABASE_KEY = "YOUR_EXISTING_PUBLIC_SUPABASE_KEY"
 
 st.set_page_config(
     page_title="Chennai Election Analysis 2027",
@@ -17,10 +18,12 @@ st.set_page_config(
 )
 
 st.title("Chennai Local Body Election 2027")
+
 st.caption(
     "Ward-wise historical election analysis, public opinion polling "
     "and experimental 2027 projections across Chennai's 200 wards."
 )
+
 st.info(
     "Public poll responses are voluntary and may not represent all Chennai voters. "
     "All 2027 projections are experimental estimates."
@@ -47,7 +50,10 @@ headers = {
 # Historical Random Forest model
 
 ml_features = ["electors", "candidates"]
-ml_data = data[ml_features + ["winner_party_ta"]].copy()
+
+ml_data = data[
+    ml_features + ["winner_party_ta"]
+].copy()
 
 for column in ml_features:
     ml_data[column] = pd.to_numeric(
@@ -97,7 +103,9 @@ ward = st.selectbox(
     all_wards
 )
 
-selected = data[data["ward_no"] == ward].iloc[0]
+selected = data[
+    data["ward_no"] == ward
+].iloc[0]
 
 # Historical vote share
 
@@ -117,7 +125,11 @@ for party_name, column in party_columns.items():
         errors="coerce"
     )
 
-    if pd.notna(valid_votes) and valid_votes > 0 and pd.notna(votes):
+    if (
+        pd.notna(valid_votes)
+        and valid_votes > 0
+        and pd.notna(votes)
+    ):
         historical[party_name] = round(
             (votes / valid_votes) * 100,
             2
@@ -135,8 +147,6 @@ st.caption(
 st.divider()
 
 # Browser identification
-
-st.write("## Current Public Opinion Poll")
 
 browser_id = streamlit_js_eval(
     js_expressions="""
@@ -159,6 +169,8 @@ if not browser_id:
     st.info("Preparing your browser ID. Please wait before voting.")
 
 # Public poll form
+
+st.write("## Current Public Opinion Poll")
 
 with st.form("public_poll"):
 
@@ -291,7 +303,11 @@ try:
     )
 
     st.metric("Total Poll Responses", len(poll))
-    st.metric("Wards with Responses", poll["ward"].nunique())
+
+    st.metric(
+        "Wards with Responses",
+        poll["ward"].nunique()
+    )
 
     leading_party = (
         results.idxmax() if len(poll) > 0 else "No responses"
@@ -321,6 +337,7 @@ try:
     )
 
     st.metric("Responses in Selected Ward", len(ward_poll))
+
     st.bar_chart(ward_results)
 
     # Ward-wise poll comparison
@@ -342,7 +359,7 @@ try:
 
     st.bar_chart(ward_comparison)
 
-    # New prediction model
+    # Statistical prediction model
 
     st.divider()
 
@@ -425,6 +442,129 @@ try:
             "forecast or a representative survey."
         )
 
+    # Machine Learning 2027 Prediction Model
+
+    st.divider()
+
+    st.title("Machine Learning 2027 Prediction Model")
+
+    ml_projection = build_ml_predictions(data, poll)
+
+    if ml_projection is None or ml_projection.empty:
+
+        st.warning(
+            "ML estimates are unavailable. Check historical data "
+            "and public poll responses."
+        )
+
+    else:
+
+        st.write("### ML Party-wise Estimated Vote Share")
+
+        ml_weights = data[
+            ["ward_no", "electors"]
+        ].copy()
+
+        ml_weights["electors"] = pd.to_numeric(
+            ml_weights["electors"],
+            errors="coerce"
+        )
+
+        ml_projection = ml_projection.merge(
+            ml_weights,
+            left_on="Ward",
+            right_on="ward_no",
+            how="left"
+        )
+
+        weights = (
+            ml_projection["electors"]
+            .fillna(0)
+            .clip(lower=0)
+        )
+
+        ml_shares = {}
+
+        for p in parties:
+
+            column = p + " ML Share (%)"
+
+            if weights.sum() > 0:
+
+                ml_shares[p] = round(
+                    float(
+                        (ml_projection[column] * weights).sum()
+                        / weights.sum()
+                    ),
+                    2
+                )
+
+            else:
+
+                ml_shares[p] = round(
+                    float(ml_projection[column].mean()),
+                    2
+                )
+
+        ml_share_series = pd.Series(ml_shares)
+
+        st.bar_chart(ml_share_series)
+
+        st.dataframe(
+            pd.DataFrame({
+                "Party": ml_share_series.index,
+                "ML Estimated Vote Share (%)": ml_share_series.values
+            }),
+            use_container_width=True
+        )
+
+        st.write("### ML Projected Seats")
+
+        ml_seats = (
+            ml_projection["ML Estimated Leading Party"]
+            .value_counts()
+            .reindex(parties, fill_value=0)
+        )
+
+        st.bar_chart(ml_seats)
+
+        st.dataframe(
+            pd.DataFrame({
+                "Party": ml_seats.index,
+                "ML Projected Seats": ml_seats.values
+            }),
+            use_container_width=True
+        )
+
+        st.metric(
+            "Wards with ML Estimates",
+            len(ml_projection)
+        )
+
+        st.metric(
+            "Total ML Projected Seats",
+            int(ml_seats.sum())
+        )
+
+        st.write("### ML Ward-wise Predictions")
+
+        st.dataframe(
+            ml_projection.drop(
+                columns=["ward_no", "electors"],
+                errors="ignore"
+            ),
+            use_container_width=True
+        )
+
+        st.caption(
+            "These are experimental ML-assisted estimates. The Random "
+            "Forest learns from 2022 historical ward winners using "
+            "elector and candidate counts. Public poll data is blended "
+            "with historical probabilities using a heuristic. TVK has "
+            "no 2022 historical training data. These estimates are not "
+            "validated 2027 election forecasts."
+        )
+
     # All Chennai ward information
 
     st.divider()
@@ -455,7 +595,7 @@ except Exception as e:
         "Poll results error: " + str(e)
     )
 
-# Random Forest results
+# Random Forest historical results
 
 st.divider()
 
@@ -472,10 +612,8 @@ st.metric(
 )
 
 comparison = pd.DataFrame({
-
     "Actual Winner": y_test.values,
     "Predicted Winner": predictions
-
 })
 
 st.write("### Actual vs Predicted Historical Winners")
@@ -494,6 +632,7 @@ st.caption(
 # Admin Dashboard
 
 st.divider()
+
 st.title("Admin Dashboard")
 
 admin_password = st.text_input(
@@ -570,14 +709,17 @@ if st.session_state.get("admin_logged_in", False):
         )
 
     except requests.RequestException as e:
+
         st.error("Poll monitoring error: " + str(e))
 
     except Exception as e:
+
         st.error("Poll monitoring error: " + str(e))
 
     # Duplicate attempt monitoring
 
     st.divider()
+
     st.subheader("Duplicate Vote Attempt Monitoring")
 
     service_key = str(
