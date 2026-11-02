@@ -549,6 +549,7 @@ st.divider()
 # Admin Dashboard
 
 # Admin Dashboard
+# Admin Dashboard
 
 st.divider()
 st.title("Admin Dashboard")
@@ -559,11 +560,9 @@ admin_password = st.text_input(
 )
 
 if st.button("Admin Login"):
-
     if admin_password == st.secrets.get("ADMIN_PASSWORD", ""):
         st.session_state["admin_logged_in"] = True
         st.success("Admin login successful!")
-
     else:
         st.session_state["admin_logged_in"] = False
         st.error("Incorrect password!")
@@ -573,7 +572,6 @@ if st.session_state.get("admin_logged_in", False):
     st.subheader("Election Poll Monitoring")
 
     try:
-
         admin_response = requests.get(
             SUPABASE_URL + "/rest/v1/poll_responses",
             headers=headers,
@@ -627,37 +625,40 @@ if st.session_state.get("admin_logged_in", False):
             use_container_width=True
         )
 
-    except Exception as e:
-
+    except requests.RequestException as e:
         st.error("Poll monitoring error: " + str(e))
 
-    # Duplicate attempt monitoring
+    except Exception as e:
+        st.error("Poll monitoring error: " + str(e))
+
+    # Duplicate Attempt Monitoring
 
     st.divider()
     st.subheader("Duplicate Vote Attempt Monitoring")
 
-    try:
+    service_key = str(
+        st.secrets.get("SUPABASE_SERVICE_KEY", "")
+    ).strip()
 
-        service_key = st.secrets.get(
-            "SUPABASE_SERVICE_KEY",
-            ""
+    if not service_key:
+        st.error(
+            "Supabase server-side secret key is missing from Streamlit Secrets."
         )
-        if not service_key.isascii():
-            st.error("Secret key contains unsupported characters. Please copy it again.")
-            st.stop()
 
-        if not service_key:
+    elif not service_key.isascii():
+        st.error(
+            "The secret key contains unsupported characters. "
+            "Please copy the Supabase Secret key again."
+        )
 
-            st.error(
-                "Supabase server-side secret key is missing from Streamlit Secrets."
-            )
+    else:
+        private_headers = {
+            "apikey": service_key,
+            "Authorization": "Bearer " + service_key,
+            "Content-Type": "application/json"
+        }
 
-        else:
-
-            private_headers = {
-                "apikey": service_key
-            }
-
+        try:
             duplicate_response = requests.get(
                 SUPABASE_URL + "/rest/v1/duplicate_vote_attempts",
                 headers=private_headers,
@@ -681,11 +682,9 @@ if st.session_state.get("admin_logged_in", False):
                 ]
             )
 
-            total_duplicates = len(duplicate_data)
-
             st.metric(
                 "Total Duplicate Attempts",
-                total_duplicates
+                len(duplicate_data)
             )
 
             if not duplicate_data.empty:
@@ -708,26 +707,21 @@ if st.session_state.get("admin_logged_in", False):
                 )
 
             else:
-
                 st.info(
                     "No duplicate voting attempts have been recorded yet."
                 )
 
-    except requests.RequestException as e:
+        except requests.RequestException as e:
+            st.error(
+                "Unable to load duplicate attempts: " + str(e)
+            )
 
-        st.error(
-            "Unable to load duplicate attempts: " + str(e)
-        )
-
-    except Exception as e:
-
-        st.error(
-            "Duplicate monitoring error: " + str(e)
-        )
+        except Exception as e:
+            st.error(
+                "Duplicate monitoring error: " + str(e)
+            )
 
     if st.button("Admin Logout"):
-
         st.session_state["admin_logged_in"] = False
         st.rerun()
-
 
