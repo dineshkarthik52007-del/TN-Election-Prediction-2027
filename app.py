@@ -645,14 +645,13 @@ if st.session_state.get("admin_logged_in", False):
             "Supabase server-side secret key is missing from Streamlit Secrets."
         )
 
-   elif not service_key.isascii():
-       bad_chars = [
-          f"Position {i}: U+{ord(ch):04X}"
-          for i, ch in enumerate(service_key)
-          if not ch.isascii()
-      ]
-      st.error("Unsupported characters found: " + ", ".join(bad_chars))
-
+    elif not service_key.isascii():
+    bad_chars = [
+        f"Position {i}: U+{ord(ch):04X}"
+        for i, ch in enumerate(service_key)
+        if not ch.isascii()
+    ]
+    st.error("Unsupported characters found: " + ", ".join(bad_chars))
     else:
         private_headers = {
             "apikey": service_key,
