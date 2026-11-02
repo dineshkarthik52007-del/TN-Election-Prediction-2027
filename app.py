@@ -217,12 +217,38 @@ with st.form("public_poll"):
                         "Your response has been recorded!"
                     )
 
-                elif response.status_code == 409:
+               
+elif response.status_code == 409:
 
-                    st.warning(
-                        "You have already voted from this browser. "
-                        "Only one response is allowed."
-                    )
+    st.warning(
+        "You have already voted from this browser. "
+        "Only one response is allowed."
+    )
+
+    duplicate_log = {
+        "browser_id": browser_id,
+        "ward": int(ward)
+    }
+
+    try:
+        log_response = requests.post(
+            SUPABASE_URL + "/rest/v1/duplicate_vote_attempts",
+            headers=headers,
+            json=duplicate_log
+        )
+
+        if log_response.status_code in [200, 201, 204]:
+            st.info("Duplicate attempt recorded.")
+
+        else:
+            st.error(
+                "Could not record duplicate attempt: "
+                + log_response.text
+            )
+
+    except Exception as e:
+        st.error("Logging error: " + str(e))
+
 
                 else:
 
