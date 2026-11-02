@@ -524,3 +524,86 @@ st.caption(
     "historical 2022 ward winners. Its test accuracy measures held-out "
     "2022 wards only. It does not establish 2027 prediction accuracy."
 )
+
+st.divider()
+
+st.title("Admin Dashboard")
+
+admin_password = st.text_input(
+    "Enter Admin Password",
+    type="password"
+)
+
+if st.button("Admin Login"):
+
+    if admin_password == st.secrets["ADMIN_PASSWORD"]:
+        st.session_state["admin_logged_in"] = True
+        st.success("Admin login successful!")
+    else:
+        st.session_state["admin_logged_in"] = False
+        st.error("Incorrect password!")
+
+if st.session_state.get("admin_logged_in", False):
+
+    st.subheader("Election Poll Monitoring")
+
+    try:
+        admin_response = requests.get(
+            SUPABASE_URL + "/rest/v1/poll_responses",
+            headers=headers,
+            params={
+                "select": "party,ward",
+                "limit": "10000"
+            }
+        )
+
+        admin_response.raise_for_status()
+
+        admin_poll = pd.DataFrame(
+            admin_response.json(),
+            columns=["party", "ward"]
+        )
+
+        st.metric(
+            "Total Poll Responses",
+            len(admin_poll)
+        )
+
+        st.metric(
+            "Participating Wards",
+            admin_poll["ward"].nunique()
+        )
+
+        st.write("### Party-wise Poll Results")
+
+        admin_results = admin_poll["party"].value_counts().reindex(
+            parties,
+            fill_value=0
+        )
+
+        st.bar_chart(admin_results)
+
+        st.write("### Ward-wise Poll Participation")
+
+        admin_ward_results = (
+            admin_poll.groupby("ward")
+            .size()
+            .reindex(all_wards, fill_value=0)
+        )
+
+        st.bar_chart(admin_ward_results)
+
+        st.write("### Poll Response Data")
+
+        st.dataframe(
+            admin_poll,
+            use_container_width=True
+        )
+
+    except Exception as e:
+        st.error("Admin dashboard error: " + str(e))
+
+    if st.button("Admin Logout"):
+        st.session_state["admin_logged_in"] = False
+        st.rerun()
+
