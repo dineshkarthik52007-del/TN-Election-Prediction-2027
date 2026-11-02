@@ -548,6 +548,9 @@ st.divider()
 
 # Admin Dashboard
 
+# Admin Dashboard
+
+st.divider()
 st.title("Admin Dashboard")
 
 admin_password = st.text_input(
@@ -626,9 +629,102 @@ if st.session_state.get("admin_logged_in", False):
 
     except Exception as e:
 
-        st.error("Admin dashboard error: " + str(e))
+        st.error("Poll monitoring error: " + str(e))
+
+    # Duplicate attempt monitoring
+
+    st.divider()
+    st.subheader("Duplicate Vote Attempt Monitoring")
+
+    try:
+
+        service_key = st.secrets.get(
+            "SUPABASE_SERVICE_KEY",
+            ""
+        )
+
+        if not service_key:
+
+            st.error(
+                "Supabase server-side secret key is missing from Streamlit Secrets."
+            )
+
+        else:
+
+            private_headers = {
+                "apikey": service_key
+            }
+
+            duplicate_response = requests.get(
+                SUPABASE_URL + "/rest/v1/duplicate_vote_attempts",
+                headers=private_headers,
+                params={
+                    "select": "id,browser_id,ward,attempted_at",
+                    "order": "attempted_at.desc",
+                    "limit": "10000"
+                },
+                timeout=20
+            )
+
+            duplicate_response.raise_for_status()
+
+            duplicate_data = pd.DataFrame(
+                duplicate_response.json(),
+                columns=[
+                    "id",
+                    "browser_id",
+                    "ward",
+                    "attempted_at"
+                ]
+            )
+
+            total_duplicates = len(duplicate_data)
+
+            st.metric(
+                "Total Duplicate Attempts",
+                total_duplicates
+            )
+
+            if not duplicate_data.empty:
+
+                st.write("### Ward-wise Duplicate Attempts")
+
+                ward_duplicates = (
+                    duplicate_data.groupby("ward")
+                    .size()
+                    .sort_index()
+                )
+
+                st.bar_chart(ward_duplicates)
+
+                st.write("### Duplicate Attempt History")
+
+                st.dataframe(
+                    duplicate_data,
+                    use_container_width=True
+                )
+
+            else:
+
+                st.info(
+                    "No duplicate voting attempts have been recorded yet."
+                )
+
+    except requests.RequestException as e:
+
+        st.error(
+            "Unable to load duplicate attempts: " + str(e)
+        )
+
+    except Exception as e:
+
+        st.error(
+            "Duplicate monitoring error: " + str(e)
+        )
 
     if st.button("Admin Logout"):
 
         st.session_state["admin_logged_in"] = False
         st.rerun()
+
+
