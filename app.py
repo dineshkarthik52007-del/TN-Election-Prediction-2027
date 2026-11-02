@@ -10,7 +10,7 @@ from prediction_model import build_prediction_model
 from ml_prediction_model import build_ml_predictions
 
 SUPABASE_URL = "https://xkiaxjhifmnsxthxkwlk.supabase.co"
-SUPABASE_KEY = "YOUR_EXISTING_PUBLIC_SUPABASE_KEY"
+SUPABASE_KEY = "sb_publishable__WT7GeEGizjxAKilJEQjhg_LbjejXtq"
 
 st.set_page_config(
     page_title="Chennai Election Analysis 2027",
