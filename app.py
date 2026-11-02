@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import requests
-
+from sklearn.ensemble import RandomForestClassifier
 SUPABASE_URL = "https://xkiaxjhifmnsxthxkwlk.supabase.co"
 SUPABASE_KEY = "sb_publishable__WT7GeEGizjxAKilJEQjhg_LbjejXtq"
 
