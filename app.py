@@ -1,3 +1,4 @@
+
 import streamlit as st
 import pandas as pd
 import requests
@@ -17,11 +18,14 @@ st.set_page_config(
 st.title("Chennai Local Body Election 2027")
 
 st.caption(
-    "A ward-wise dashboard for historical election analysis "
-    "and public opinion polling across Chennai's 200 wards."
+    "Ward-wise historical election analysis, public opinion polling "
+    "and experimental 2027 projections across Chennai's 200 wards."
 )
 
-st.subheader("Ward-wise Election Analysis Dashboard")
+st.info(
+    "Public poll responses are voluntary and may not represent the views "
+    "of all Chennai voters. All 2027 projections are experimental estimates."
+)
 
 data = pd.read_csv("chennai_complete_2022.csv")
 
@@ -41,10 +45,9 @@ headers = {
     "Content-Type": "application/json"
 }
 
-# Random Forest historical model
+# Historical Random Forest model
 
 ml_features = ["electors", "candidates"]
-
 ml_data = data[ml_features + ["winner_party_ta"]].copy()
 
 for column in ml_features:
@@ -80,21 +83,15 @@ model.fit(X_train, y_train)
 
 predictions = model.predict(X_test)
 
-accuracy = accuracy_score(
-    y_test,
-    predictions
-)
+accuracy = accuracy_score(y_test, predictions)
 
 majority_baseline = (
     y_test.value_counts(normalize=True).max() * 100
 )
 
-st.info(
-    "This dashboard compares historical 2022 election results "
-    "with voluntary public opinion poll responses."
-)
-
 # Ward selection
+
+st.subheader("Ward-wise Election Analysis Dashboard")
 
 ward = st.selectbox(
     "Select Chennai Ward",
@@ -131,9 +128,8 @@ for party_name, column in party_columns.items():
 st.bar_chart(pd.Series(historical))
 
 st.caption(
-    "Percentages are calculated using valid votes. "
-    "TVK did not contest in 2022, so its historical vote share is unavailable. "
-    "Only the displayed parties are included in this comparison."
+    "Historical percentages use valid votes. TVK did not contest in 2022. "
+    "The historical dataset's displayed party columns do not include every party."
 )
 
 st.divider()
@@ -231,33 +227,27 @@ with st.form("public_poll"):
                         )
 
                         if log_response.status_code in [200, 201, 204]:
-
                             st.info("Duplicate attempt recorded.")
-
                         else:
-
                             st.error(
                                 "Could not record duplicate attempt: "
                                 + log_response.text
                             )
 
                     except requests.RequestException as e:
-
                         st.error("Logging error: " + str(e))
 
                 else:
-
                     st.error(
                         "Unable to submit vote: " + response.text
                     )
 
             except requests.RequestException as e:
-
                 st.error("Connection error: " + str(e))
 
 st.divider()
 
-# Poll results
+# Load public poll results
 
 st.write("## Four-Party Poll Comparison")
 
@@ -291,68 +281,49 @@ try:
 
     poll["ward"] = poll["ward"].astype(int)
 
-    # Overall poll results
+    poll = poll[poll["party"].isin(parties)]
+
+    # Overall public poll results
 
     results = poll["party"].value_counts().reindex(
         parties,
         fill_value=0
     )
 
-    st.metric(
-        "Total Poll Responses",
-        len(poll)
-    )
-
-    st.metric(
-        "Wards with Responses",
-        poll["ward"].nunique()
-    )
+    st.metric("Total Poll Responses", len(poll))
+    st.metric("Wards with Responses", poll["ward"].nunique())
 
     if len(poll) > 0:
         leading_party = results.idxmax()
     else:
         leading_party = "No responses"
 
-    st.metric(
-        "Overall Leading Party",
-        leading_party
-    )
+    st.metric("Overall Poll Leading Party", leading_party)
 
+    st.write("### Overall Poll Votes")
     st.bar_chart(results)
 
-    # Party percentages
-
     if len(poll) > 0:
-
-        percentages = (
-            results / len(poll)
-        ) * 100
+        percentages = results / len(poll) * 100
 
         st.write("### Party-wise Poll Percentage")
-
         st.bar_chart(percentages)
 
-    # Selected ward results
+    # Selected ward poll results
 
     st.write("### Selected Ward Results")
 
-    ward_poll = poll[
-        poll["ward"] == int(ward)
-    ]
+    ward_poll = poll[poll["ward"] == int(ward)]
 
     ward_results = ward_poll["party"].value_counts().reindex(
         parties,
         fill_value=0
     )
 
-    st.metric(
-        "Responses in Selected Ward",
-        len(ward_poll)
-    )
-
+    st.metric("Responses in Selected Ward", len(ward_poll))
     st.bar_chart(ward_results)
 
-    # Ward-wise comparison
+    # Ward-wise poll comparison
 
     st.write("### Ward-wise Party Comparison")
 
@@ -371,10 +342,9 @@ try:
 
     st.bar_chart(ward_comparison)
 
+    # Experimental ward-wise projection
+
     st.divider()
-
-    # 2027 experimental projection
-
     st.write("## 2027 Experimental Ward-wise Projection")
 
     projection_rows = []
@@ -382,92 +352,271 @@ try:
     for ward_no in all_wards:
 
         ward_data = ward_comparison.loc[ward_no]
-
-        total_responses = int(
-            ward_data.sum()
-        )
-
-        if total_responses > 0:
-
-            leading_party = ward_data.idxmax()
-
-            poll_percentage = round(
-                (ward_data.max() / total_responses) * 100,
-                2
-            )
-
-        else:
-
-            leading_party = "No responses"
-            poll_percentage = 0
+        total_responses = int(ward_data.sum())
 
         historical_row = data[
             data["ward_no"] == ward_no
         ]
 
+        historical_shares = {
+            party_name: 0.0 for party_name in parties
+        }
+
         if not historical_row.empty:
 
-            historical_winner = (
-                historical_row.iloc[0]["winner_party_ta"]
+            history = historical_row.iloc[0]
+
+            valid = pd.to_numeric(
+                history["valid_votes"],
+                errors="coerce"
+            )
+
+            if pd.notna(valid) and valid > 0:
+
+                for party_name, column in party_columns.items():
+
+                    votes = pd.to_numeric(
+                        history[column],
+                        errors="coerce"
+                    )
+
+                    if pd.notna(votes):
+                        historical_shares[party_name] = (
+                            votes / valid
+                        ) * 100
+
+        # Normalize the three available historical party shares
+        # so the historical baseline is comparable among four parties.
+
+        historical_total = sum(historical_shares.values())
+
+        if historical_total > 0:
+
+            for party_name in parties:
+                historical_shares[party_name] = (
+                    historical_shares[party_name]
+                    / historical_total
+                ) * 100
+
+        # Poll percentages for this ward
+
+        if total_responses > 0:
+
+            poll_shares = (
+                ward_data / total_responses
+            ) * 100
+
+            # More poll responses increase the poll's weight.
+            # This is a chosen experimental weighting rule,
+            # not a statistically validated survey adjustment.
+
+            poll_weight = total_responses / (
+                total_responses + 20
             )
 
         else:
 
-            historical_winner = "Data unavailable"
+            poll_shares = pd.Series(
+                0.0,
+                index=parties
+            )
+
+            poll_weight = 0.0
+
+        # Combine historical baseline and current poll
+
+        estimated_shares = {}
+
+        for party_name in parties:
+
+            historical_value = historical_shares[party_name]
+            poll_value = float(poll_shares[party_name])
+
+            estimated_shares[party_name] = (
+                historical_value * (1 - poll_weight)
+                + poll_value * poll_weight
+            )
+
+        estimated_total = sum(estimated_shares.values())
+
+        if estimated_total > 0:
+
+            for party_name in parties:
+                estimated_shares[party_name] = (
+                    estimated_shares[party_name]
+                    / estimated_total
+                ) * 100
+
+        projected_winner = max(
+            estimated_shares,
+            key=estimated_shares.get
+        )
 
         projection_rows.append({
 
             "Ward": ward_no,
-
-            "2022 Historical Winner": historical_winner,
-
-            "2027 Poll Leading Party": leading_party,
-
+            "2022 Historical Winner": (
+                historical_row.iloc[0]["winner_party_ta"]
+                if not historical_row.empty
+                else "Data unavailable"
+            ),
             "Poll Responses": total_responses,
-
-            "Leading Party Poll Share (%)": poll_percentage
+            "Poll Weight (%)": round(poll_weight * 100, 2),
+            "TVK Estimated Share (%)": round(
+                estimated_shares["TVK"], 2
+            ),
+            "DMK Estimated Share (%)": round(
+                estimated_shares["DMK"], 2
+            ),
+            "AIADMK Estimated Share (%)": round(
+                estimated_shares["AIADMK"], 2
+            ),
+            "NTK Estimated Share (%)": round(
+                estimated_shares["NTK"], 2
+            ),
+            "Projected Leading Party": projected_winner
 
         })
 
-    projection_data = pd.DataFrame(
-        projection_rows
-    )
+    projection_data = pd.DataFrame(projection_rows)
 
     st.dataframe(
         projection_data,
         use_container_width=True
     )
 
+    # Overall Chennai-level prediction
+
+    st.divider()
+    st.title("Chennai Overall 2027 Experimental Prediction")
+
+    st.write("### Party-wise Estimated Vote Share")
+
+    share_columns = {
+        "TVK": "TVK Estimated Share (%)",
+        "DMK": "DMK Estimated Share (%)",
+        "AIADMK": "AIADMK Estimated Share (%)",
+        "NTK": "NTK Estimated Share (%)"
+    }
+
+    overall_shares = {}
+
+    for party_name, column in share_columns.items():
+        overall_shares[party_name] = round(
+            projection_data[column].mean(),
+            2
+        )
+
+    overall_share_series = pd.Series(overall_shares)
+
+    st.bar_chart(overall_share_series)
+
+    share_table = pd.DataFrame({
+        "Party": overall_share_series.index,
+        "Estimated Vote Share (%)": overall_share_series.values
+    })
+
+    st.dataframe(
+        share_table,
+        use_container_width=True
+    )
+
+    # Projected seat calculation
+
+    st.write("### Projected Seats Across 200 Wards")
+
+    seat_results = (
+        projection_data["Projected Leading Party"]
+        .value_counts()
+        .reindex(parties, fill_value=0)
+    )
+
+    seat_table = pd.DataFrame({
+        "Party": seat_results.index,
+        "Projected Seats": seat_results.values
+    })
+
+    st.bar_chart(seat_results)
+
+    st.dataframe(
+        seat_table,
+        use_container_width=True
+    )
+
+    total_projected_seats = int(seat_results.sum())
+
+    st.metric(
+        "Total Projected Seats",
+        total_projected_seats
+    )
+
+    # Ward coverage
+
+    wards_with_poll = int(
+        (projection_data["Poll Responses"] > 0).sum()
+    )
+
+    wards_without_poll = len(projection_data) - wards_with_poll
+
+    st.write("### Prediction Coverage")
+
+    col1, col2, col3 = st.columns(3)
+
+    col1.metric(
+        "Total Wards",
+        len(projection_data)
+    )
+
+    col2.metric(
+        "Wards with Poll Responses",
+        wards_with_poll
+    )
+
+    col3.metric(
+        "Wards without Poll Responses",
+        wards_without_poll
+    )
+
     st.caption(
-        "This experimental projection is based on voluntary public poll "
-        "responses. It is not an official election forecast."
+        "Method: historical DMK, AIADMK and NTK vote shares are normalized "
+        "within the three available historical party columns. TVK has no "
+        "2022 baseline. Each ward's historical baseline is blended with its "
+        "four-party poll share using poll_weight = responses / (responses + 20). "
+        "Overall vote shares are simple averages across wards, not elector-weighted "
+        "Chennai-wide vote shares. Projected seats count the highest estimated "
+        "share in each ward. These are experimental estimates, not validated "
+        "predictions or official election results."
     )
 
     # Leading party in each ward
 
     st.write("### Leading Party in Each Ward")
 
-    leading_party_list = []
+    st.dataframe(
+        projection_data[
+            [
+                "Ward",
+                "Poll Responses",
+                "Projected Leading Party"
+            ]
+        ],
+        use_container_width=True
+    )
 
-    for index, row in ward_comparison.iterrows():
+    # Original historical comparison
 
-        if row.sum() > 0:
-            leading_party_list.append(row.idxmax())
-        else:
-            leading_party_list.append("No responses")
-
-    leading_results = pd.DataFrame({
-
-        "Ward": ward_comparison.index,
-
-        "Leading Party": leading_party_list,
-
-        "Poll Responses": ward_comparison.sum(axis=1).values
-
-    })
+    st.divider()
+    st.write("## All Chennai Ward Information")
 
     st.dataframe(
-        leading_results,
+        data[
+            [
+                "ward_no",
+                "winner_party_ta",
+                "margin",
+                "polled_pct"
+            ]
+        ],
         use_container_width=True
     )
 
@@ -483,32 +632,9 @@ except Exception as e:
         "Poll results error: " + str(e)
     )
 
-st.divider()
-
-# All ward information
-
-st.write("## All Chennai Ward Information")
-
-st.dataframe(
-    data[
-        [
-            "ward_no",
-            "winner_party_ta",
-            "margin",
-            "polled_pct"
-        ]
-    ],
-    use_container_width=True
-)
-
-st.caption(
-    "Public opinion poll responses are voluntary and are not "
-    "representative election forecasts."
-)
-
-st.divider()
-
 # Random Forest results
+
+st.divider()
 
 st.write("## Random Forest Model - Historical Test Results")
 
@@ -525,7 +651,6 @@ st.metric(
 comparison = pd.DataFrame({
 
     "Actual Winner": y_test.values,
-
     "Predicted Winner": predictions
 
 })
@@ -543,8 +668,6 @@ st.caption(
     "2022 wards only. It does not establish 2027 prediction accuracy."
 )
 
-st.divider()
-
 # Admin Dashboard
 
 st.divider()
@@ -556,6 +679,7 @@ admin_password = st.text_input(
 )
 
 if st.button("Admin Login"):
+
     if admin_password == st.secrets.get("ADMIN_PASSWORD", ""):
         st.session_state["admin_logged_in"] = True
         st.success("Admin login successful!")
@@ -568,6 +692,7 @@ if st.session_state.get("admin_logged_in", False):
     st.subheader("Election Poll Monitoring")
 
     try:
+
         admin_response = requests.get(
             SUPABASE_URL + "/rest/v1/poll_responses",
             headers=headers,
@@ -627,7 +752,7 @@ if st.session_state.get("admin_logged_in", False):
     except Exception as e:
         st.error("Poll monitoring error: " + str(e))
 
-    # Duplicate Attempt Monitoring
+    # Duplicate attempt monitoring
 
     st.divider()
     st.subheader("Duplicate Vote Attempt Monitoring")
@@ -636,27 +761,21 @@ if st.session_state.get("admin_logged_in", False):
         st.secrets.get("SUPABASE_SERVICE_KEY", "")
     ).strip()
 
-    st.write("Secret key length:", len(service_key))
-    st.write("Secret key is ASCII:", service_key.isascii())
-
     if not service_key:
+
         st.error(
             "Supabase server-side secret key is missing from Streamlit Secrets."
         )
 
     elif not service_key.isascii():
-        bad_chars = [
-            f"Position {i}: U+{ord(ch):04X}"
-            for i, ch in enumerate(service_key)
-            if not ch.isascii()
-        ]
 
         st.error(
-            "Unsupported characters found: "
-            + ", ".join(bad_chars)
+            "The Supabase server-side secret key contains unsupported characters. "
+            "Please check Streamlit Secrets."
         )
 
     else:
+
         private_headers = {
             "apikey": service_key,
             "Authorization": "Bearer " + service_key,
@@ -664,6 +783,7 @@ if st.session_state.get("admin_logged_in", False):
         }
 
         try:
+
             duplicate_response = requests.get(
                 SUPABASE_URL + "/rest/v1/duplicate_vote_attempts",
                 headers=private_headers,
@@ -712,20 +832,24 @@ if st.session_state.get("admin_logged_in", False):
                 )
 
             else:
+
                 st.info(
                     "No duplicate voting attempts have been recorded yet."
                 )
 
         except requests.RequestException as e:
+
             st.error(
                 "Unable to load duplicate attempts: " + str(e)
             )
 
         except Exception as e:
+
             st.error(
                 "Duplicate monitoring error: " + str(e)
             )
 
     if st.button("Admin Logout"):
+
         st.session_state["admin_logged_in"] = False
         st.rerun()
