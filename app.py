@@ -642,6 +642,9 @@ if st.session_state.get("admin_logged_in", False):
             "SUPABASE_SERVICE_KEY",
             ""
         )
+        if not service_key.isascii():
+            st.error("Secret key contains unsupported characters. Please copy it again.")
+            st.stop()
 
         if not service_key:
 
