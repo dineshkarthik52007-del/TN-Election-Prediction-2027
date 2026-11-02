@@ -18,7 +18,7 @@ st.caption(
 st.subheader("Ward-wise Election Analysis Dashboard")
 
 data = pd.read_csv("chennai_complete_2022.csv")
-st.write("Dataset Columns:", data.columns.tolist())
+
 
 parties = ["TVK", "DMK", "AIADMK", "NTK"]
 
@@ -121,6 +121,7 @@ try:
     leading_party = results.idxmax() if len(poll) > 0 else "No responses"
     st.metric("Overall Leading Party", leading_party)
     st.bar_chart(results)
+       
     if len(poll) > 0:
         percentages = (results / len(poll)) * 100
         st.write("### Party-wise Poll Percentage")
@@ -151,6 +152,51 @@ try:
     ).sort_index()
 
     st.bar_chart(ward_comparison)
+    st.divider()
+    st.write("## 2027 Experimental Ward-wise Projection")
+
+    projection_rows = []
+
+    for ward_no in ward_comparison.index:
+        ward_data = ward_comparison.loc[ward_no]
+        total_responses = int(ward_data.sum())
+
+        if total_responses > 0:
+            leading_party = ward_data.idxmax()
+            leading_votes = int(ward_data.max())
+            poll_percentage = round(
+                (leading_votes / total_responses) * 100, 2
+            )
+        else:
+            leading_party = "Not enough responses"
+            leading_votes = 0
+            poll_percentage = 0
+
+        historical_row = data[
+            data["ward_no"] == int(ward_no)
+        ]
+
+        if not historical_row.empty:
+            historical_winner = historical_row.iloc[0]["winner_party_ta"]
+        else:
+            historical_winner = "Data unavailable"
+
+        projection_rows.append({
+            "Ward": ward_no,
+            "2022 Historical Winner": historical_winner,
+            "2027 Poll Leading Party": leading_party,
+            "Poll Responses": total_responses,
+            "Leading Party Poll Share (%)": poll_percentage
+        })
+
+    projection_data = pd.DataFrame(projection_rows)
+
+    st.dataframe(projection_data, use_container_width=True)
+
+    st.caption(
+        "Experimental projection based on voluntary public poll responses. "
+        "It is not an official election forecast or a trained machine-learning prediction."
+    )
     st.write("### Leading Party in Each Ward")
 
     leading_results = pd.DataFrame({
