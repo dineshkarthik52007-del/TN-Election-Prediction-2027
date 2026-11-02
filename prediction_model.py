@@ -3,14 +3,33 @@ import pandas as pd
 
 PARTIES = ["TVK", "DMK", "AIADMK", "NTK"]
 
+PRIOR_STRENGTH = 20
+
 
 def build_prediction_model(historical_data, poll_data):
 
-    wards = sorted(
-        historical_data["ward_no"].dropna().unique()
+    historical_data = historical_data.copy()
+    poll_data = poll_data.copy()
+
+    historical_data["ward_no"] = pd.to_numeric(
+        historical_data["ward_no"],
+        errors="coerce"
     )
 
-    poll_data = poll_data.copy()
+    historical_data = historical_data.dropna(
+        subset=["ward_no"]
+    )
+
+    historical_data["ward_no"] = (
+        historical_data["ward_no"].astype(int)
+    )
+
+    wards = sorted(
+        historical_data["ward_no"].unique()
+    )
+
+    if not wards:
+        return None, None, None
 
     poll_data["ward"] = pd.to_numeric(
         poll_data["ward"],
@@ -25,6 +44,7 @@ def build_prediction_model(historical_data, poll_data):
 
     poll_data = poll_data[
         poll_data["party"].isin(PARTIES)
+        & poll_data["ward"].isin(wards)
     ]
 
     overall_counts = (
@@ -56,15 +76,9 @@ def build_prediction_model(historical_data, poll_data):
 
         ward_total = int(ward_counts.sum())
 
-        # Bayesian-style smoothing:
-        # sparse ward polls are adjusted towards the
-        # overall Chennai public poll distribution.
-
-        prior_strength = 20
-
         estimated_counts = (
             ward_counts
-            + prior_strength * overall_shares
+            + PRIOR_STRENGTH * overall_shares
         )
 
         estimated_shares = (
@@ -77,12 +91,14 @@ def build_prediction_model(historical_data, poll_data):
 
         if not historical_row.empty:
 
-            historical_winner = (
-                historical_row.iloc[0]["winner_party_ta"]
+            historical_row = historical_row.iloc[0]
+
+            historical_winner = historical_row.get(
+                "winner_party_ta", "Unavailable"
             )
 
             electors = pd.to_numeric(
-                historical_row.iloc[0]["electors"],
+                historical_row.get("electors", 0),
                 errors="coerce"
             )
 
@@ -90,64 +106,84 @@ def build_prediction_model(historical_data, poll_data):
                 electors = 0
 
         else:
-
             historical_winner = "Unavailable"
             electors = 0
 
         projected_winner = estimated_shares.idxmax()
+
+        if ward_total > 0:
+            projection_basis = (
+                "Ward poll + Chennai-wide smoothing"
+            )
+            poll_coverage = "Poll responses available"
+        else:
+            projection_basis = (
+                "Chennai-wide poll prior only"
+            )
+            poll_coverage = "No ward poll responses"
 
         result = {
             "Ward": int(ward),
             "2022 Historical Winner": historical_winner,
             "2022 Electors": int(electors),
             "Poll Responses": ward_total,
+            "Poll Coverage": poll_coverage,
+            "Projection Basis": projection_basis,
             "Projected Leading Party": projected_winner
         }
 
         for party in PARTIES:
             result[party + " Estimated Share (%)"] = round(
-                estimated_shares[party], 2
+                float(estimated_shares[party]), 2
             )
 
         ward_rows.append(result)
 
     projection = pd.DataFrame(ward_rows)
 
-    # Approximate Chennai-wide share, weighted by
-    # 2022 ward elector counts.
+    # Chennai-wide elector-weighted estimated shares
 
-    weights = projection["2022 Electors"].clip(lower=0)
+    weights = pd.to_numeric(
+        projection["2022 Electors"],
+        errors="coerce"
+    ).fillna(0).clip(lower=0)
+
+    overall_vote_shares = {}
 
     if weights.sum() > 0:
-        overall_vote_shares = {}
 
         for party in PARTIES:
+
             column = party + " Estimated Share (%)"
 
             overall_vote_shares[party] = round(
-                (
-                    projection[column] * weights
-                ).sum() / weights.sum(),
+                float(
+                    (projection[column] * weights).sum()
+                    / weights.sum()
+                ),
                 2
             )
-    else:
-        overall_vote_shares = {
-            party: round(
-                projection[
-                    party + " Estimated Share (%)"
-                ].mean(),
-                2
-            )
-            for party in PARTIES
-        }
 
-    # Projected seats
+    else:
+
+        for party in PARTIES:
+
+            column = party + " Estimated Share (%)"
+
+            overall_vote_shares[party] = round(
+                float(projection[column].mean()),
+                2
+            )
+
+    # Projected seats across all available wards
 
     projected_seats = (
         projection["Projected Leading Party"]
         .value_counts()
         .reindex(PARTIES, fill_value=0)
     )
+
+    projected_seats = projected_seats.astype(int)
 
     return (
         projection,
