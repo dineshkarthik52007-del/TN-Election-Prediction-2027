@@ -6,7 +6,7 @@ PARTIES = ["TVK", "DMK", "AIADMK", "NTK"]
 PRIOR_STRENGTH = 20
 
 
-def build_prediction_model(historical_data, poll_data):
+def build_ml_predictions(historical_data, poll_data):
 
     historical_data = historical_data.copy()
     poll_data = poll_data.copy()
