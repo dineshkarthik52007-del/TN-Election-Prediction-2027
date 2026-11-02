@@ -1,3 +1,4 @@
+streamlit-js-eval
 scikit-learn
 requests
 streamlit
