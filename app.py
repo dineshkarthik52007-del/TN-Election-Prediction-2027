@@ -1,4 +1,3 @@
-
 import streamlit as st
 import pandas as pd
 import requests
@@ -548,9 +547,6 @@ st.divider()
 
 # Admin Dashboard
 
-# Admin Dashboard
-# Admin Dashboard
-
 st.divider()
 st.title("Admin Dashboard")
 
@@ -640,18 +636,26 @@ if st.session_state.get("admin_logged_in", False):
         st.secrets.get("SUPABASE_SERVICE_KEY", "")
     ).strip()
 
+    st.write("Secret key length:", len(service_key))
+    st.write("Secret key is ASCII:", service_key.isascii())
+
     if not service_key:
         st.error(
             "Supabase server-side secret key is missing from Streamlit Secrets."
         )
 
     elif not service_key.isascii():
-    bad_chars = [
-        f"Position {i}: U+{ord(ch):04X}"
-        for i, ch in enumerate(service_key)
-        if not ch.isascii()
-    ]
-    st.error("Unsupported characters found: " + ", ".join(bad_chars))
+        bad_chars = [
+            f"Position {i}: U+{ord(ch):04X}"
+            for i, ch in enumerate(service_key)
+            if not ch.isascii()
+        ]
+
+        st.error(
+            "Unsupported characters found: "
+            + ", ".join(bad_chars)
+        )
+
     else:
         private_headers = {
             "apikey": service_key,
@@ -725,4 +729,3 @@ if st.session_state.get("admin_logged_in", False):
     if st.button("Admin Logout"):
         st.session_state["admin_logged_in"] = False
         st.rerun()
-
