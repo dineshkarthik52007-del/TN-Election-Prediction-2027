@@ -243,20 +243,21 @@ def choose_party(party_name):
             st.session_state["party_radio_" + other_party] = None
 
 
-# Party rows
+# Compact party rows with clearly visible photos
 
 for party_name in parties:
 
     photo_col, name_col, radio_col = st.columns(
-        [1, 2, 1],
-        gap="small"
+        [1.2, 2.5, 0.6],
+        gap="small",
+        vertical_alignment="center"
     )
 
     with photo_col:
 
         st.image(
             party_leaders[party_name]["image"],
-            width=85
+            width=100
         )
 
     with name_col:
