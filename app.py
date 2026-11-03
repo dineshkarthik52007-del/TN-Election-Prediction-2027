@@ -21,7 +21,7 @@ SUPABASE_KEY = str(
 ).strip()
 
 PHONE_HASH_SECRET = str(
-    st.secrets.get("719a6434f7d251646bcf2059db4ee62b4dcd8bf42d4668b5a538ed8a46c7f37f", "")
+    st.secrets.get("PHONE_HASH_SECRET", "")
 ).strip()
 
 if not SUPABASE_KEY:
