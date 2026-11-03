@@ -243,41 +243,66 @@ def choose_party(party_name):
             st.session_state["party_radio_" + other_party] = None
 
 
-# Compact party rows with clearly visible photos
+# Compact party rows
 
-for party_name in parties:
+st.markdown("""
+<style>
+.st-key-poll_party_rows [data-testid="stHorizontalBlock"] {
+    gap: 0.25rem;
+    align-items: center;
+}
 
-    photo_col, name_col, radio_col = st.columns(
-        [1.2, 2.5, 0.6],
-        gap="small",
-        vertical_alignment="center"
-    )
+.st-key-poll_party_rows [data-testid="column"] {
+    padding-left: 0;
+    padding-right: 0;
+}
 
-    with photo_col:
+.st-key-poll_party_rows [data-testid="stImage"] {
+    margin: 0;
+}
 
-        st.image(
-            party_leaders[party_name]["image"],
-            width=100
+.st-key-poll_party_rows [data-testid="stRadio"] {
+    margin: 0;
+    padding: 0;
+}
+</style>
+""", unsafe_allow_html=True)
+
+with st.container(key="poll_party_rows"):
+
+    for party_name in parties:
+
+        photo_col, name_col, radio_col = st.columns(
+            [0.9, 1.5, 0.35],
+            gap="small",
+            vertical_alignment="center"
         )
 
-    with name_col:
+        with photo_col:
 
-        st.markdown(
-            f"**{party_name}**  \n"
-            f"{party_leaders[party_name]['leader']}"
-        )
+            st.image(
+                party_leaders[party_name]["image"],
+                width=100
+            )
 
-    with radio_col:
+        with name_col:
 
-        st.radio(
-            "Select " + party_name,
-            [party_name],
-            index=None,
-            key="party_radio_" + party_name,
-            on_change=choose_party,
-            args=(party_name,),
-            label_visibility="collapsed"
-        )
+            st.markdown(
+                f"**{party_name}**  \n"
+                f"{party_leaders[party_name]['leader']}"
+            )
+
+        with radio_col:
+
+            st.radio(
+                "Select " + party_name,
+                [party_name],
+                index=None,
+                key="party_radio_" + party_name,
+                on_change=choose_party,
+                args=(party_name,),
+                label_visibility="collapsed"
+            )
 
 
 # Mobile number and vote submission
