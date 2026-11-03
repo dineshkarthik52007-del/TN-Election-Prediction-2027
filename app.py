@@ -64,17 +64,6 @@ headers = {
     "apikey": SUPABASE_KEY,
     "Content-Type": "application/json"
 }
-st.write("Supabase key loaded:", bool(SUPABASE_KEY))
-
-test_response = requests.get(
-    SUPABASE_URL + "/rest/v1/poll_responses",
-    headers=headers,
-    params={"select": "party,ward", "limit": "1"},
-    timeout=20
-)
-
-st.write("Supabase status:", test_response.status_code)
-st.write("Supabase response:", test_response.text[:500])
 
 
 # Historical Random Forest model
@@ -337,8 +326,6 @@ with st.form("public_poll"):
 
 
 st.divider()
-
-
 # Load public poll results
 
 st.write("## Four-Party Poll Comparison")
@@ -375,7 +362,6 @@ try:
 
     poll = poll[poll["party"].isin(parties)]
 
-
     # Overall public poll results
 
     results = poll["party"].value_counts().reindex(
@@ -406,7 +392,6 @@ try:
         st.write("### Party-wise Poll Percentage")
         st.bar_chart(percentages)
 
-
     # Selected ward poll results
 
     st.write("### Selected Ward Results")
@@ -421,7 +406,6 @@ try:
     st.metric("Responses in Selected Ward", len(ward_poll))
 
     st.bar_chart(ward_results)
-
 
     # Ward-wise poll comparison
 
@@ -441,7 +425,6 @@ try:
     ).sort_index()
 
     st.bar_chart(ward_comparison)
-
 
     # Statistical prediction model
 
@@ -525,7 +508,6 @@ try:
             "using 2022 ward elector counts. This is not a validated election "
             "forecast or a representative survey."
         )
-
 
     # Machine Learning 2027 Prediction Model
 
@@ -650,7 +632,6 @@ try:
             "validated 2027 election forecasts."
         )
 
-
     # All Chennai ward information
 
     st.divider()
@@ -715,8 +696,6 @@ st.caption(
     "historical 2022 ward winners. Its test accuracy measures held-out "
     "2022 wards only. It does not establish 2027 prediction accuracy."
 )
-
-
 # Admin Dashboard
 
 st.divider()
@@ -733,6 +712,7 @@ if st.button("Admin Login"):
     if admin_password == st.secrets.get("ADMIN_PASSWORD", ""):
         st.session_state["admin_logged_in"] = True
         st.success("Admin login successful!")
+
     else:
         st.session_state["admin_logged_in"] = False
         st.error("Incorrect password!")
