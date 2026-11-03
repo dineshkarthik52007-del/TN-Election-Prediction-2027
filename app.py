@@ -211,7 +211,7 @@ if not browser_id:
     st.info("Preparing your browser ID. Please wait before voting.")
 
 
-# Public poll with aligned photos and radio buttons
+# Compact public poll
 
 st.write("## Current Public Opinion Poll")
 
@@ -224,6 +224,9 @@ st.caption(
 st.write(
     "If the election were held today, which party would you support?"
 )
+
+
+# Single-party selection
 
 if "selected_party" not in st.session_state:
     st.session_state["selected_party"] = None
@@ -240,23 +243,27 @@ def choose_party(party_name):
             st.session_state["party_radio_" + other_party] = None
 
 
+# Party rows
+
 for party_name in parties:
 
-    photo_col, name_col, radio_col = st.columns([1, 2, 1])
+    photo_col, name_col, radio_col = st.columns(
+        [1, 2, 1],
+        gap="small"
+    )
 
     with photo_col:
 
         st.image(
             party_leaders[party_name]["image"],
-            width=110
+            width=85
         )
 
     with name_col:
 
-        st.write("**" + party_name + "**")
-
-        st.write(
-            party_leaders[party_name]["leader"]
+        st.markdown(
+            f"**{party_name}**  \n"
+            f"{party_leaders[party_name]['leader']}"
         )
 
     with radio_col:
@@ -270,8 +277,6 @@ for party_name in parties:
             args=(party_name,),
             label_visibility="collapsed"
         )
-
-    st.divider()
 
 
 # Mobile number and vote submission
