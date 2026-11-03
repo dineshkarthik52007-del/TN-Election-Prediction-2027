@@ -57,6 +57,25 @@ party_columns = {
     "NTK": "நா.த.க."
 }
 
+party_leaders = {
+    "TVK": {
+        "leader": "Vijay",
+        "image": "website/images/vijay.jpg"
+    },
+    "DMK": {
+        "leader": "M. K. Stalin",
+        "image": "website/images/stalin.jpg"
+    },
+    "AIADMK": {
+        "leader": "Edappadi K. Palaniswami",
+        "image": "website/images/eps.jpg"
+    },
+    "NTK": {
+        "leader": "Seeman",
+        "image": "website/images/seeman.jpg"
+    }
+}
+
 all_wards = sorted(data["ward_no"].dropna().unique())
 
 
@@ -191,7 +210,7 @@ if not browser_id:
     st.info("Preparing your browser ID. Please wait before voting.")
 
 
-# Public poll form with mobile-number protection
+# Public poll form with leader photos
 
 st.write("## Current Public Opinion Poll")
 
@@ -207,9 +226,27 @@ with st.form("public_poll"):
         "If the election were held today, which party would you support?"
     )
 
+    poll_cols = st.columns(4)
+
+    for i, party_name in enumerate(parties):
+
+        with poll_cols[i]:
+
+            st.image(
+                party_leaders[party_name]["image"],
+                use_container_width=True
+            )
+
+            st.write("**" + party_name + "**")
+
+            st.caption(
+                party_leaders[party_name]["leader"]
+            )
+
     party = st.radio(
         "Select your preferred party",
-        parties
+        parties,
+        horizontal=True
     )
 
     mobile_number = st.text_input(
@@ -326,6 +363,8 @@ with st.form("public_poll"):
 
 
 st.divider()
+
+
 # Load public poll results
 
 st.write("## Four-Party Poll Comparison")
@@ -696,6 +735,8 @@ st.caption(
     "historical 2022 ward winners. Its test accuracy measures held-out "
     "2022 wards only. It does not establish 2027 prediction accuracy."
 )
+
+
 # Admin Dashboard
 
 st.divider()
