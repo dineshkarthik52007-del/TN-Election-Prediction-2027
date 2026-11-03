@@ -17,11 +17,11 @@ from ml_prediction_model import build_ml_predictions
 SUPABASE_URL = "https://xkiaxjhifmnsxthxkwlk.supabase.co"
 
 SUPABASE_KEY = str(
-    st.secrets.get("SUPABASE_KEY", "")
+    st.secrets.get("sb_publishable__WT7GeEGizjxAKilJEQjhg_LbjejXtq", "")
 ).strip()
 
 PHONE_HASH_SECRET = str(
-    st.secrets.get("PHONE_HASH_SECRET", "")
+    st.secrets.get("719a6434f7d251646bcf2059db4ee62b4dcd8bf42d4668b5a538ed8a46c7f37f", "")
 ).strip()
 
 
