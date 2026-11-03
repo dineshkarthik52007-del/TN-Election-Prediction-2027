@@ -210,7 +210,7 @@ if not browser_id:
     st.info("Preparing your browser ID. Please wait before voting.")
 
 
-# Public poll form with leader photos
+# Public poll form with left-side photos and right-side voting options
 
 st.write("## Current Public Opinion Poll")
 
@@ -226,28 +226,30 @@ with st.form("public_poll"):
         "If the election were held today, which party would you support?"
     )
 
-    poll_cols = st.columns(4)
+    photo_col, vote_col = st.columns([1, 2])
 
-    for i, party_name in enumerate(parties):
+    with photo_col:
 
-        with poll_cols[i]:
+        for party_name in parties:
 
             st.image(
                 party_leaders[party_name]["image"],
-                use_container_width=True
+                width=130
             )
-
-            st.write("**" + party_name + "**")
 
             st.caption(
                 party_leaders[party_name]["leader"]
             )
 
-    party = st.radio(
-        "Select your preferred party",
-        parties,
-        horizontal=True
-    )
+    with vote_col:
+
+        party = st.radio(
+            "Select your preferred party",
+            parties,
+            format_func=lambda p: p + " - " + party_leaders[p]["leader"],
+            index=None,
+            key="party_vote"
+        )
 
     mobile_number = st.text_input(
         "Enter your 10-digit Indian mobile number",
@@ -276,6 +278,10 @@ with st.form("public_poll"):
                 "Mobile-number protection is not configured. "
                 "Please contact the administrator."
             )
+
+        elif party is None:
+
+            st.warning("Please select a party before submitting.")
 
         elif not re.fullmatch(r"[6-9][0-9]{9}", cleaned_number):
 
@@ -401,8 +407,6 @@ try:
 
     poll = poll[poll["party"].isin(parties)]
 
-    # Overall public poll results
-
     results = poll["party"].value_counts().reindex(
         parties,
         fill_value=0
@@ -431,8 +435,6 @@ try:
         st.write("### Party-wise Poll Percentage")
         st.bar_chart(percentages)
 
-    # Selected ward poll results
-
     st.write("### Selected Ward Results")
 
     ward_poll = poll[poll["ward"] == int(ward)]
@@ -445,8 +447,6 @@ try:
     st.metric("Responses in Selected Ward", len(ward_poll))
 
     st.bar_chart(ward_results)
-
-    # Ward-wise poll comparison
 
     st.write("### Ward-wise Party Comparison")
 
@@ -464,6 +464,7 @@ try:
     ).sort_index()
 
     st.bar_chart(ward_comparison)
+
 
     # Statistical prediction model
 
@@ -547,6 +548,7 @@ try:
             "using 2022 ward elector counts. This is not a validated election "
             "forecast or a representative survey."
         )
+
 
     # Machine Learning 2027 Prediction Model
 
@@ -670,6 +672,7 @@ try:
             "no 2022 historical training data. These estimates are not "
             "validated 2027 election forecasts."
         )
+
 
     # All Chennai ward information
 
