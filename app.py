@@ -1,3 +1,4 @@
+
 import streamlit as st
 import pandas as pd
 import requests
@@ -210,7 +211,7 @@ if not browser_id:
     st.info("Preparing your browser ID. Please wait before voting.")
 
 
-# Public poll form with left-side photos and right-side voting options
+# Public poll with aligned photos and radio buttons
 
 st.write("## Current Public Opinion Poll")
 
@@ -220,36 +221,62 @@ st.caption(
     "Mobile ownership is not verified because this poll does not use OTP."
 )
 
-with st.form("public_poll"):
+st.write(
+    "If the election were held today, which party would you support?"
+)
 
-    st.write(
-        "If the election were held today, which party would you support?"
-    )
+if "selected_party" not in st.session_state:
+    st.session_state["selected_party"] = None
 
-    photo_col, vote_col = st.columns([1, 2])
+
+def choose_party(party_name):
+
+    st.session_state["selected_party"] = party_name
+
+    for other_party in parties:
+
+        if other_party != party_name:
+
+            st.session_state["party_radio_" + other_party] = None
+
+
+for party_name in parties:
+
+    photo_col, name_col, radio_col = st.columns([1, 2, 1])
 
     with photo_col:
 
-        for party_name in parties:
-
-            st.image(
-                party_leaders[party_name]["image"],
-                width=130
-            )
-
-            st.caption(
-                party_leaders[party_name]["leader"]
-            )
-
-    with vote_col:
-
-        party = st.radio(
-            "Select your preferred party",
-            parties,
-            format_func=lambda p: p + " - " + party_leaders[p]["leader"],
-            index=None,
-            key="party_vote"
+        st.image(
+            party_leaders[party_name]["image"],
+            width=110
         )
+
+    with name_col:
+
+        st.write("**" + party_name + "**")
+
+        st.write(
+            party_leaders[party_name]["leader"]
+        )
+
+    with radio_col:
+
+        st.radio(
+            "Select " + party_name,
+            [party_name],
+            index=None,
+            key="party_radio_" + party_name,
+            on_change=choose_party,
+            args=(party_name,),
+            label_visibility="collapsed"
+        )
+
+    st.divider()
+
+
+# Mobile number and vote submission
+
+with st.form("public_poll"):
 
     mobile_number = st.text_input(
         "Enter your 10-digit Indian mobile number",
@@ -259,9 +286,16 @@ with st.form("public_poll"):
 
     st.write("Selected Ward:", int(ward))
 
+    selected_party = st.session_state.get("selected_party")
+
+    if selected_party:
+        st.success("Selected Party: " + selected_party)
+
     submit = st.form_submit_button("Submit Vote")
 
     if submit:
+
+        party = st.session_state.get("selected_party")
 
         cleaned_number = re.sub(
             r"\D",
