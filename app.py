@@ -17,7 +17,7 @@ from ml_prediction_model import build_ml_predictions
 SUPABASE_URL = "https://xkiaxjhifmnsxthxkwlk.supabase.co"
 
 SUPABASE_KEY = str(
-    st.secrets.get("sb_publishable__WT7GeEGizjxAKilJEQjhg_LbjejXtq", "")
+    st.secrets.get("SUPABASE_KEY", "")
 ).strip()
 
 PHONE_HASH_SECRET = str(
