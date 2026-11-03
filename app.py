@@ -4,17 +4,26 @@ import requests
 import hashlib
 import hmac
 import re
+
+from streamlit_js_eval import streamlit_js_eval
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
+
 from prediction_model import build_prediction_model
 from ml_prediction_model import build_ml_predictions
 
+
 SUPABASE_URL = "https://xkiaxjhifmnsxthxkwlk.supabase.co"
-SUPABASE_KEY = "sb_publishable__WT7GeEGizjxAKilJEQjhg_LbjejXtq"
-PHONE_HASH_SECRET = str(
-    st.secrets.get("719a6434f7d251646bcf2059db4ee62b4dcd8bf42d4668b5a538ed8a46c7f37f", "")
+
+SUPABASE_KEY = str(
+    st.secrets.get("SUPABASE_KEY", "")
 ).strip()
+
+PHONE_HASH_SECRET = str(
+    st.secrets.get("PHONE_HASH_SECRET", "")
+).strip()
+
 
 st.set_page_config(
     page_title="Chennai Election Analysis 2027",
@@ -33,6 +42,7 @@ st.info(
     "All 2027 projections are experimental estimates."
 )
 
+
 data = pd.read_csv("chennai_complete_2022.csv")
 
 parties = ["TVK", "DMK", "AIADMK", "NTK"]
@@ -45,11 +55,13 @@ party_columns = {
 
 all_wards = sorted(data["ward_no"].dropna().unique())
 
+
 headers = {
     "apikey": SUPABASE_KEY,
     "Authorization": "Bearer " + SUPABASE_KEY,
     "Content-Type": "application/json"
 }
+
 
 # Historical Random Forest model
 
@@ -98,6 +110,7 @@ majority_baseline = (
     y_test.value_counts(normalize=True).max() * 100
 )
 
+
 # Ward selection
 
 st.subheader("Ward-wise Election Analysis Dashboard")
@@ -110,6 +123,7 @@ ward = st.selectbox(
 selected = data[
     data["ward_no"] == ward
 ].iloc[0]
+
 
 # Historical vote share
 
@@ -150,7 +164,31 @@ st.caption(
 
 st.divider()
 
-# Public poll form with mobile-number duplicate protection
+
+# Browser identification
+
+browser_id = streamlit_js_eval(
+    js_expressions="""
+    (() => {
+        let id = localStorage.getItem("chennai_poll_browser_id");
+
+        if (!id) {
+            id = crypto.randomUUID();
+            localStorage.setItem("chennai_poll_browser_id", id);
+        }
+
+        return id;
+    })()
+    """,
+    key="browser_id",
+    want_output=True
+)
+
+if not browser_id:
+    st.info("Preparing your browser ID. Please wait before voting.")
+
+
+# Public poll form with mobile-number protection
 
 st.write("## Current Public Opinion Poll")
 
@@ -206,6 +244,12 @@ with st.form("public_poll"):
                 "starting with 6, 7, 8 or 9."
             )
 
+        elif not browser_id:
+
+            st.warning(
+                "Please wait while your browser is being identified."
+            )
+
         else:
 
             phone_hash = hmac.new(
@@ -218,7 +262,7 @@ with st.form("public_poll"):
                 "party": party,
                 "ward": int(ward),
                 "phone_hash": phone_hash,
-                "browser_id": phone_hash
+                "browser_id": str(browser_id)
             }
 
             try:
@@ -226,7 +270,6 @@ with st.form("public_poll"):
                 response = requests.post(
                     SUPABASE_URL + "/rest/v1/poll_responses",
                     headers=headers,
-                    params={"on_conflict": "phone_hash"},
                     json=vote,
                     timeout=20
                 )
@@ -240,12 +283,12 @@ with st.form("public_poll"):
                 elif response.status_code == 409:
 
                     st.warning(
-                        "This mobile number has already been used to vote. "
-                        "Only one response is allowed per number."
+                        "This mobile number or browser has already voted. "
+                        "Only one response is allowed per mobile number."
                     )
 
                     duplicate_log = {
-                        "browser_id": phone_hash,
+                        "browser_id": str(browser_id),
                         "ward": int(ward)
                     }
 
@@ -260,11 +303,14 @@ with st.form("public_poll"):
 
                         if log_response.status_code in [200, 201, 204]:
                             st.info("Duplicate attempt recorded.")
+                        else:
+                            st.error(
+                                "Could not record duplicate attempt: "
+                                + log_response.text
+                            )
 
-                    except requests.RequestException:
-                        st.info(
-                            "The duplicate attempt could not be logged."
-                        )
+                    except requests.RequestException as e:
+                        st.error("Logging error: " + str(e))
 
                 else:
 
@@ -273,10 +319,11 @@ with st.form("public_poll"):
                     )
 
             except requests.RequestException as e:
-
                 st.error("Connection error: " + str(e))
 
+
 st.divider()
+
 
 # Load public poll results
 
@@ -314,6 +361,7 @@ try:
 
     poll = poll[poll["party"].isin(parties)]
 
+
     # Overall public poll results
 
     results = poll["party"].value_counts().reindex(
@@ -344,6 +392,7 @@ try:
         st.write("### Party-wise Poll Percentage")
         st.bar_chart(percentages)
 
+
     # Selected ward poll results
 
     st.write("### Selected Ward Results")
@@ -358,6 +407,7 @@ try:
     st.metric("Responses in Selected Ward", len(ward_poll))
 
     st.bar_chart(ward_results)
+
 
     # Ward-wise poll comparison
 
@@ -377,6 +427,7 @@ try:
     ).sort_index()
 
     st.bar_chart(ward_comparison)
+
 
     # Statistical prediction model
 
@@ -460,6 +511,7 @@ try:
             "using 2022 ward elector counts. This is not a validated election "
             "forecast or a representative survey."
         )
+
 
     # Machine Learning 2027 Prediction Model
 
@@ -584,6 +636,7 @@ try:
             "validated 2027 election forecasts."
         )
 
+
     # All Chennai ward information
 
     st.divider()
@@ -613,6 +666,7 @@ except Exception as e:
     st.error(
         "Poll results error: " + str(e)
     )
+
 
 # Random Forest historical results
 
@@ -648,6 +702,7 @@ st.caption(
     "2022 wards only. It does not establish 2027 prediction accuracy."
 )
 
+
 # Admin Dashboard
 
 st.divider()
@@ -667,6 +722,7 @@ if st.button("Admin Login"):
     else:
         st.session_state["admin_logged_in"] = False
         st.error("Incorrect password!")
+
 
 if st.session_state.get("admin_logged_in", False):
 
@@ -734,6 +790,7 @@ if st.session_state.get("admin_logged_in", False):
     except Exception as e:
 
         st.error("Poll monitoring error: " + str(e))
+
 
     # Duplicate attempt monitoring
 
@@ -832,6 +889,7 @@ if st.session_state.get("admin_logged_in", False):
             st.error(
                 "Duplicate monitoring error: " + str(e)
             )
+
 
     if st.button("Admin Logout"):
 
