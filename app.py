@@ -60,6 +60,17 @@ headers = {
     "apikey": SUPABASE_KEY,
     "Content-Type": "application/json"
 }
+st.write("Supabase key loaded:", bool(SUPABASE_KEY))
+
+test_response = requests.get(
+    SUPABASE_URL + "/rest/v1/poll_responses",
+    headers=headers,
+    params={"select": "party,ward", "limit": "1"},
+    timeout=20
+)
+
+st.write("Supabase status:", test_response.status_code)
+st.write("Supabase response:", test_response.text[:500])
 
 
 # Historical Random Forest model
