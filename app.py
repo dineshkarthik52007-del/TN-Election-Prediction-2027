@@ -13,7 +13,7 @@ from ml_prediction_model import build_ml_predictions
 SUPABASE_URL = "https://xkiaxjhifmnsxthxkwlk.supabase.co"
 SUPABASE_KEY = "sb_publishable__WT7GeEGizjxAKilJEQjhg_LbjejXtq"
 PHONE_HASH_SECRET = str(
-    st.secrets.get("1b0808f9936ab213b3a944c9a0d09bec0b730eb232260b4c852c10f835445f77", "")
+    st.secrets.get("719a6434f7d251646bcf2059db4ee62b4dcd8bf42d4668b5a538ed8a46c7f37f", "")
 ).strip()
 
 st.set_page_config(
