@@ -58,7 +58,6 @@ all_wards = sorted(data["ward_no"].dropna().unique())
 
 headers = {
     "apikey": SUPABASE_KEY,
-    "Authorization": "Bearer " + SUPABASE_KEY,
     "Content-Type": "application/json"
 }
 
