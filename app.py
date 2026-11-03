@@ -1,8 +1,9 @@
-
 import streamlit as st
 import pandas as pd
 import requests
-from streamlit_js_eval import streamlit_js_eval
+import hashlib
+import hmac
+import re
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
@@ -11,6 +12,9 @@ from ml_prediction_model import build_ml_predictions
 
 SUPABASE_URL = "https://xkiaxjhifmnsxthxkwlk.supabase.co"
 SUPABASE_KEY = "sb_publishable__WT7GeEGizjxAKilJEQjhg_LbjejXtq"
+PHONE_HASH_SECRET = str(
+    st.secrets.get("1b0808f9936ab213b3a944c9a0d09bec0b730eb232260b4c852c10f835445f77", "")
+).strip()
 
 st.set_page_config(
     page_title="Chennai Election Analysis 2027",
@@ -146,31 +150,15 @@ st.caption(
 
 st.divider()
 
-# Browser identification
-
-browser_id = streamlit_js_eval(
-    js_expressions="""
-    (() => {
-        let id = localStorage.getItem("chennai_poll_browser_id");
-
-        if (!id) {
-            id = crypto.randomUUID();
-            localStorage.setItem("chennai_poll_browser_id", id);
-        }
-
-        return id;
-    })()
-    """,
-    key="browser_id",
-    want_output=True
-)
-
-if not browser_id:
-    st.info("Preparing your browser ID. Please wait before voting.")
-
-# Public poll form
+# Public poll form with mobile-number duplicate protection
 
 st.write("## Current Public Opinion Poll")
+
+st.caption(
+    "Enter your mobile number to submit one response. "
+    "A secure keyed hash is stored instead of your actual number. "
+    "Mobile ownership is not verified because this poll does not use OTP."
+)
 
 with st.form("public_poll"):
 
@@ -183,23 +171,54 @@ with st.form("public_poll"):
         parties
     )
 
+    mobile_number = st.text_input(
+        "Enter your 10-digit Indian mobile number",
+        max_chars=15,
+        placeholder="Example: 9876543210"
+    )
+
     st.write("Selected Ward:", int(ward))
 
     submit = st.form_submit_button("Submit Vote")
 
     if submit:
 
-        if not browser_id:
+        cleaned_number = re.sub(
+            r"\D",
+            "",
+            mobile_number
+        )
+
+        if cleaned_number.startswith("91") and len(cleaned_number) == 12:
+            cleaned_number = cleaned_number[2:]
+
+        if not PHONE_HASH_SECRET:
+
+            st.error(
+                "Mobile-number protection is not configured. "
+                "Please contact the administrator."
+            )
+
+        elif not re.fullmatch(r"[6-9][0-9]{9}", cleaned_number):
+
             st.warning(
-                "Please wait while your browser is being identified."
+                "Please enter a valid 10-digit Indian mobile number "
+                "starting with 6, 7, 8 or 9."
             )
 
         else:
 
+            phone_hash = hmac.new(
+                PHONE_HASH_SECRET.encode("utf-8"),
+                cleaned_number.encode("utf-8"),
+                hashlib.sha256
+            ).hexdigest()
+
             vote = {
                 "party": party,
                 "ward": int(ward),
-                "browser_id": str(browser_id)
+                "phone_hash": phone_hash,
+                "browser_id": phone_hash
             }
 
             try:
@@ -207,6 +226,7 @@ with st.form("public_poll"):
                 response = requests.post(
                     SUPABASE_URL + "/rest/v1/poll_responses",
                     headers=headers,
+                    params={"on_conflict": "phone_hash"},
                     json=vote,
                     timeout=20
                 )
@@ -220,12 +240,12 @@ with st.form("public_poll"):
                 elif response.status_code == 409:
 
                     st.warning(
-                        "You have already voted from this browser. "
-                        "Only one response is allowed."
+                        "This mobile number has already been used to vote. "
+                        "Only one response is allowed per number."
                     )
 
                     duplicate_log = {
-                        "browser_id": str(browser_id),
+                        "browser_id": phone_hash,
                         "ward": int(ward)
                     }
 
@@ -240,21 +260,20 @@ with st.form("public_poll"):
 
                         if log_response.status_code in [200, 201, 204]:
                             st.info("Duplicate attempt recorded.")
-                        else:
-                            st.error(
-                                "Could not record duplicate attempt: "
-                                + log_response.text
-                            )
 
-                    except requests.RequestException as e:
-                        st.error("Logging error: " + str(e))
+                    except requests.RequestException:
+                        st.info(
+                            "The duplicate attempt could not be logged."
+                        )
 
                 else:
+
                     st.error(
                         "Unable to submit vote: " + response.text
                     )
 
             except requests.RequestException as e:
+
                 st.error("Connection error: " + str(e))
 
 st.divider()
