@@ -1,10 +1,10 @@
-
 import streamlit as st
 import pandas as pd
 import requests
 import hashlib
 import hmac
 import re
+import os
 
 from streamlit_js_eval import streamlit_js_eval
 from sklearn.ensemble import RandomForestClassifier
@@ -269,6 +269,8 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 
+# Updated party images with file checking
+
 with st.container(key="poll_party_rows"):
 
     for party_name in parties:
@@ -281,10 +283,20 @@ with st.container(key="poll_party_rows"):
 
         with photo_col:
 
-            st.image(
-                party_leaders[party_name]["image"],
-                width=100
-            )
+            image_path = party_leaders[party_name]["image"]
+
+            if os.path.isfile(image_path):
+
+                st.image(
+                    image_path,
+                    width=100
+                )
+
+            else:
+
+                st.error(
+                    "Image not found: " + image_path
+                )
 
         with name_col:
 
@@ -649,11 +661,6 @@ else:
     st.info(
         "Verify your mobile number before submitting your vote."
     )
-
-
-st.divider()
-
-
 # Load public poll results
 
 st.write("## Four-Party Poll Comparison")
@@ -1224,3 +1231,5 @@ if st.session_state.get("admin_logged_in", False):
 
         st.session_state["admin_logged_in"] = False
         st.rerun()
+
+st.divider()
