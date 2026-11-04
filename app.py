@@ -15,6 +15,8 @@ from prediction_model import build_prediction_model
 from ml_prediction_model import build_ml_predictions
 
 
+# Supabase configuration
+
 SUPABASE_URL = "https://xkiaxjhifmnsxthxkwlk.supabase.co"
 
 SUPABASE_KEY = str(
@@ -48,6 +50,8 @@ st.info(
 )
 
 
+# Load historical data
+
 data = pd.read_csv("chennai_complete_2022.csv")
 
 parties = ["TVK", "DMK", "AIADMK", "NTK"]
@@ -79,6 +83,8 @@ party_leaders = {
 
 all_wards = sorted(data["ward_no"].dropna().unique())
 
+
+# Supabase headers
 
 headers = {
     "apikey": SUPABASE_KEY,
@@ -211,22 +217,18 @@ if not browser_id:
     st.info("Preparing your browser ID. Please wait before voting.")
 
 
-# Compact public poll
+# Party selection
 
 st.write("## Current Public Opinion Poll")
 
 st.caption(
-    "Enter your mobile number to submit one response. "
-    "A secure keyed hash is stored instead of your actual number. "
-    "Mobile ownership is not verified because this poll does not use OTP."
+    "Verify your mobile number before submitting your response. "
+    "A keyed hash is stored instead of your actual mobile number."
 )
 
 st.write(
     "If the election were held today, which party would you support?"
 )
-
-
-# Single-party selection
 
 if "selected_party" not in st.session_state:
     st.session_state["selected_party"] = None
@@ -242,8 +244,6 @@ def choose_party(party_name):
 
             st.session_state["party_radio_" + other_party] = None
 
-
-# Compact party rows
 
 st.markdown("""
 <style>
@@ -267,6 +267,7 @@ st.markdown("""
 }
 </style>
 """, unsafe_allow_html=True)
+
 
 with st.container(key="poll_party_rows"):
 
@@ -305,15 +306,221 @@ with st.container(key="poll_party_rows"):
             )
 
 
-# Mobile number and vote submission
+# Phone number normalization
 
-with st.form("public_poll"):
+def normalize_phone(number):
 
-    mobile_number = st.text_input(
-        "Enter your 10-digit Indian mobile number",
-        max_chars=15,
-        placeholder="Example: 9876543210"
+    cleaned = re.sub(r"\D", "", number)
+
+    if cleaned.startswith("91") and len(cleaned) == 12:
+        cleaned = cleaned[2:]
+
+    if re.fullmatch(r"[6-9][0-9]{9}", cleaned):
+
+        return "+91" + cleaned, cleaned
+
+    return None, None
+
+
+# OTP session initialization
+
+if "otp_pending_phone" not in st.session_state:
+    st.session_state["otp_pending_phone"] = None
+
+if "otp_sent" not in st.session_state:
+    st.session_state["otp_sent"] = False
+
+if "verified_phone" not in st.session_state:
+    st.session_state["verified_phone"] = None
+
+if "phone_access_token" not in st.session_state:
+    st.session_state["phone_access_token"] = None
+
+
+# Mobile verification
+
+st.divider()
+
+st.write("## Mobile Number Verification")
+
+mobile_number = st.text_input(
+    "Enter your 10-digit Indian mobile number",
+    max_chars=15,
+    placeholder="Example: 9876543210",
+    key="otp_mobile"
+)
+
+phone_e164, cleaned_number = normalize_phone(mobile_number)
+
+
+# Reset verification if number changes
+
+if (
+    st.session_state["otp_pending_phone"]
+    and phone_e164 != st.session_state["otp_pending_phone"]
+):
+
+    st.session_state["otp_pending_phone"] = None
+    st.session_state["otp_sent"] = False
+    st.session_state["verified_phone"] = None
+    st.session_state["phone_access_token"] = None
+
+
+if (
+    st.session_state["verified_phone"]
+    and phone_e164 != st.session_state["verified_phone"]
+):
+
+    st.session_state["verified_phone"] = None
+    st.session_state["phone_access_token"] = None
+
+
+# Send OTP
+
+if not st.session_state["verified_phone"]:
+
+    if st.button("Send OTP"):
+
+        if not phone_e164:
+
+            st.warning(
+                "Enter a valid 10-digit Indian mobile number."
+            )
+
+        else:
+
+            try:
+
+                auth_response = requests.post(
+                    SUPABASE_URL + "/auth/v1/otp",
+                    headers=headers,
+                    json={
+                        "phone": phone_e164,
+                        "create_user": True
+                    },
+                    timeout=20
+                )
+
+                if auth_response.status_code in [200, 201]:
+
+                    st.session_state["otp_pending_phone"] = phone_e164
+                    st.session_state["otp_sent"] = True
+
+                    st.success(
+                        "OTP request accepted. Enter your configured test OTP."
+                    )
+
+                else:
+
+                    st.error(
+                        "OTP request failed: "
+                        + auth_response.text
+                    )
+
+            except requests.RequestException as e:
+
+                st.error("Connection error: " + str(e))
+
+
+# Verify OTP
+
+if (
+    st.session_state["otp_sent"]
+    and not st.session_state["verified_phone"]
+):
+
+    with st.form("verify_phone_otp"):
+
+        otp_code = st.text_input(
+            "Enter your 6-digit OTP",
+            max_chars=6,
+            type="password"
+        )
+
+        verify_button = st.form_submit_button("Verify OTP")
+
+        if verify_button:
+
+            if not re.fullmatch(r"[0-9]{6}", otp_code):
+
+                st.warning("Enter a valid 6-digit OTP.")
+
+            else:
+
+                try:
+
+                    verify_response = requests.post(
+                        SUPABASE_URL + "/auth/v1/verify",
+                        headers=headers,
+                        json={
+                            "phone": st.session_state["otp_pending_phone"],
+                            "token": otp_code,
+                            "type": "sms"
+                        },
+                        timeout=20
+                    )
+
+                    if verify_response.status_code == 200:
+
+                        auth_data = verify_response.json()
+
+                        access_token = auth_data.get("access_token")
+
+                        if not access_token:
+
+                            st.error(
+                                "Verification response did not contain "
+                                "an access token."
+                            )
+
+                        else:
+
+                            st.session_state["verified_phone"] = (
+                                st.session_state["otp_pending_phone"]
+                            )
+
+                            st.session_state["phone_access_token"] = (
+                                access_token
+                            )
+
+                            st.success(
+                                "Mobile number verified successfully!"
+                            )
+
+                            st.rerun()
+
+                    else:
+
+                        st.error(
+                            "OTP verification failed: "
+                            + verify_response.text
+                        )
+
+                except requests.RequestException as e:
+
+                    st.error(
+                        "Verification connection error: " + str(e)
+                    )
+
+
+# Vote submission after verification
+
+phone_verified = (
+    st.session_state["verified_phone"] == phone_e164
+    and phone_e164 is not None
+    and st.session_state["phone_access_token"] is not None
+)
+
+if phone_verified:
+
+    st.success("Mobile number verified successfully.")
+
+    st.write(
+        "Verified number: +91******"
+        + cleaned_number[-4:]
     )
+
+    st.write("## Submit Your Vote")
 
     st.write("Selected Ward:", int(ward))
 
@@ -322,115 +529,126 @@ with st.form("public_poll"):
     if selected_party:
         st.success("Selected Party: " + selected_party)
 
-    submit = st.form_submit_button("Submit Vote")
+    with st.form("public_poll"):
 
-    if submit:
+        submit = st.form_submit_button("Submit Vote")
 
-        party = st.session_state.get("selected_party")
+        if submit:
 
-        cleaned_number = re.sub(
-            r"\D",
-            "",
-            mobile_number
-        )
+            party = st.session_state.get("selected_party")
 
-        if cleaned_number.startswith("91") and len(cleaned_number) == 12:
-            cleaned_number = cleaned_number[2:]
+            if not PHONE_HASH_SECRET:
 
-        if not PHONE_HASH_SECRET:
-
-            st.error(
-                "Mobile-number protection is not configured. "
-                "Please contact the administrator."
-            )
-
-        elif party is None:
-
-            st.warning("Please select a party before submitting.")
-
-        elif not re.fullmatch(r"[6-9][0-9]{9}", cleaned_number):
-
-            st.warning(
-                "Please enter a valid 10-digit Indian mobile number "
-                "starting with 6, 7, 8 or 9."
-            )
-
-        elif not browser_id:
-
-            st.warning(
-                "Please wait while your browser is being identified."
-            )
-
-        else:
-
-            phone_hash = hmac.new(
-                PHONE_HASH_SECRET.encode("utf-8"),
-                cleaned_number.encode("utf-8"),
-                hashlib.sha256
-            ).hexdigest()
-
-            vote = {
-                "party": party,
-                "ward": int(ward),
-                "phone_hash": phone_hash,
-                "browser_id": str(browser_id)
-            }
-
-            try:
-
-                response = requests.post(
-                    SUPABASE_URL + "/rest/v1/poll_responses",
-                    headers=headers,
-                    json=vote,
-                    timeout=20
+                st.error(
+                    "Mobile-number protection is not configured."
                 )
 
-                if response.status_code in [200, 201, 204]:
+            elif party is None:
 
-                    st.success(
-                        "Your response has been recorded!"
+                st.warning(
+                    "Please select a party before submitting."
+                )
+
+            elif not browser_id:
+
+                st.warning(
+                    "Please wait while your browser is identified."
+                )
+
+            else:
+
+                phone_hash = hmac.new(
+                    PHONE_HASH_SECRET.encode("utf-8"),
+                    cleaned_number.encode("utf-8"),
+                    hashlib.sha256
+                ).hexdigest()
+
+                vote = {
+                    "party": party,
+                    "ward": int(ward),
+                    "phone_hash": phone_hash,
+                    "browser_id": str(browser_id)
+                }
+
+                authenticated_headers = {
+                    "apikey": SUPABASE_KEY,
+                    "Authorization": (
+                        "Bearer "
+                        + st.session_state["phone_access_token"]
+                    ),
+                    "Content-Type": "application/json"
+                }
+
+                try:
+
+                    response = requests.post(
+                        SUPABASE_URL + "/rest/v1/poll_responses",
+                        headers=authenticated_headers,
+                        json=vote,
+                        timeout=20
                     )
 
-                elif response.status_code == 409:
+                    if response.status_code in [200, 201, 204]:
 
-                    st.warning(
-                        "This mobile number or browser has already voted. "
-                        "Only one response is allowed per mobile number."
-                    )
-
-                    duplicate_log = {
-                        "browser_id": str(browser_id),
-                        "ward": int(ward)
-                    }
-
-                    try:
-
-                        log_response = requests.post(
-                            SUPABASE_URL + "/rest/v1/duplicate_vote_attempts",
-                            headers=headers,
-                            json=duplicate_log,
-                            timeout=20
+                        st.success(
+                            "Your response has been recorded!"
                         )
 
-                        if log_response.status_code in [200, 201, 204]:
-                            st.info("Duplicate attempt recorded.")
-                        else:
-                            st.error(
-                                "Could not record duplicate attempt: "
-                                + log_response.text
+                    elif response.status_code == 409:
+
+                        st.warning(
+                            "This mobile number or browser has already voted. "
+                            "Only one response is allowed per mobile number."
+                        )
+
+                        duplicate_log = {
+                            "browser_id": str(browser_id),
+                            "ward": int(ward)
+                        }
+
+                        try:
+
+                            log_response = requests.post(
+                                SUPABASE_URL
+                                + "/rest/v1/duplicate_vote_attempts",
+                                headers=authenticated_headers,
+                                json=duplicate_log,
+                                timeout=20
                             )
 
-                    except requests.RequestException as e:
-                        st.error("Logging error: " + str(e))
+                            if log_response.status_code in [200, 201, 204]:
 
-                else:
+                                st.info("Duplicate attempt recorded.")
+
+                            else:
+
+                                st.error(
+                                    "Could not record duplicate attempt: "
+                                    + log_response.text
+                                )
+
+                        except requests.RequestException as e:
+
+                            st.error("Logging error: " + str(e))
+
+                    else:
+
+                        st.error(
+                            "Unable to submit vote: "
+                            + response.text
+                        )
+
+                except requests.RequestException as e:
 
                     st.error(
-                        "Unable to submit vote: " + response.text
+                        "Connection error: " + str(e)
                     )
 
-            except requests.RequestException as e:
-                st.error("Connection error: " + str(e))
+else:
+
+    st.info(
+        "Verify your mobile number before submitting your vote."
+    )
 
 
 st.divider()
@@ -488,7 +706,10 @@ try:
         results.idxmax() if len(poll) > 0 else "No responses"
     )
 
-    st.metric("Overall Poll Leading Party", leading_party)
+    st.metric(
+        "Overall Poll Leading Party",
+        leading_party
+    )
 
     st.write("### Overall Poll Votes")
     st.bar_chart(results)
@@ -509,7 +730,10 @@ try:
         fill_value=0
     )
 
-    st.metric("Responses in Selected Ward", len(ward_poll))
+    st.metric(
+        "Responses in Selected Ward",
+        len(ward_poll)
+    )
 
     st.bar_chart(ward_results)
 
@@ -615,7 +839,7 @@ try:
         )
 
 
-    # Machine Learning 2027 Prediction Model
+    # Machine Learning prediction model
 
     st.divider()
 
@@ -805,7 +1029,7 @@ st.caption(
 )
 
 
-# Admin Dashboard
+# Admin dashboard
 
 st.divider()
 
@@ -819,10 +1043,12 @@ admin_password = st.text_input(
 if st.button("Admin Login"):
 
     if admin_password == st.secrets.get("ADMIN_PASSWORD", ""):
+
         st.session_state["admin_logged_in"] = True
         st.success("Admin login successful!")
 
     else:
+
         st.session_state["admin_logged_in"] = False
         st.error("Incorrect password!")
 
