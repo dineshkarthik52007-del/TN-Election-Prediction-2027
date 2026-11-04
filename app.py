@@ -4,8 +4,6 @@ import requests
 import hashlib
 import hmac
 import re
-import os
-
 from pathlib import Path
 
 from streamlit_js_eval import streamlit_js_eval
@@ -15,6 +13,14 @@ from sklearn.metrics import accuracy_score
 
 from prediction_model import build_prediction_model
 from ml_prediction_model import build_ml_predictions
+
+
+# Page configuration
+
+st.set_page_config(
+    page_title="Chennai Election Analysis 2027",
+    layout="wide"
+)
 
 
 # Base directory
@@ -39,10 +45,7 @@ if not SUPABASE_KEY:
     st.stop()
 
 
-st.set_page_config(
-    page_title="Chennai Election Analysis 2027",
-    layout="wide"
-)
+# Main heading
 
 st.title("Chennai Local Body Election 2027")
 
@@ -70,24 +73,31 @@ party_columns = {
 }
 
 
-# Party leaders and absolute image paths
+# Party leaders and verified GitHub image URLs
+
+GITHUB_IMAGE_BASE = (
+    "https://raw.githubusercontent.com/"
+    "dineshkarthik52007-del/"
+    "TN-Election-Prediction-2027/"
+    "main/website/images/"
+)
 
 party_leaders = {
     "TVK": {
         "leader": "Vijay",
-        "image": BASE_DIR / "website" / "images" / "vijay.jpg"
+        "image": GITHUB_IMAGE_BASE + "vijay.jpg"
     },
     "DMK": {
         "leader": "M. K. Stalin",
-        "image": BASE_DIR / "website" / "images" / "stalin.jpg"
+        "image": GITHUB_IMAGE_BASE + "stalin.jpg"
     },
     "AIADMK": {
         "leader": "Edappadi K. Palaniswami",
-        "image": BASE_DIR / "website" / "images" / "eps.jpg"
+        "image": GITHUB_IMAGE_BASE + "eps.jpg"
     },
     "NTK": {
         "leader": "Seeman",
-        "image": BASE_DIR / "website" / "images" / "seeman.jpg"
+        "image": GITHUB_IMAGE_BASE + "seeman.jpg"
     }
 }
 
@@ -256,6 +266,8 @@ def choose_party(party_name):
             st.session_state["party_radio_" + other_party] = None
 
 
+# Party row styling
+
 st.markdown("""
 <style>
 .st-key-poll_party_rows [data-testid="stHorizontalBlock"] {
@@ -280,7 +292,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 
-# Party images with absolute path checking
+# Display all four party images
 
 with st.container(key="poll_party_rows"):
 
@@ -294,20 +306,10 @@ with st.container(key="poll_party_rows"):
 
         with photo_col:
 
-            image_path = party_leaders[party_name]["image"]
-
-            if image_path.is_file():
-
-                st.image(
-                    str(image_path),
-                    width=100
-                )
-
-            else:
-
-                st.error(
-                    f"Image not found: {image_path}"
-                )
+            st.image(
+                party_leaders[party_name]["image"],
+                width=100
+            )
 
         with name_col:
 
@@ -524,7 +526,9 @@ if (
                     st.error(
                         "Verification connection error: " + str(e)
                     )
-                    # Vote submission after verification
+
+
+# Vote submission after verification
 
 phone_verified = (
     st.session_state["verified_phone"] == phone_e164
@@ -1010,7 +1014,9 @@ except Exception as e:
     st.error(
         "Poll results error: " + str(e)
     )
-    # Random Forest historical results
+
+
+# Random Forest historical results
 
 st.divider()
 
