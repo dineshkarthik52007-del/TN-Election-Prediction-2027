@@ -6,6 +6,8 @@ import hmac
 import re
 import os
 
+from pathlib import Path
+
 from streamlit_js_eval import streamlit_js_eval
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
@@ -13,6 +15,11 @@ from sklearn.metrics import accuracy_score
 
 from prediction_model import build_prediction_model
 from ml_prediction_model import build_ml_predictions
+
+
+# Base directory
+
+BASE_DIR = Path(__file__).resolve().parent
 
 
 # Supabase configuration
@@ -52,7 +59,7 @@ st.info(
 
 # Load historical data
 
-data = pd.read_csv("chennai_complete_2022.csv")
+data = pd.read_csv(BASE_DIR / "chennai_complete_2022.csv")
 
 parties = ["TVK", "DMK", "AIADMK", "NTK"]
 
@@ -62,24 +69,28 @@ party_columns = {
     "NTK": "நா.த.க."
 }
 
+
+# Party leaders and absolute image paths
+
 party_leaders = {
     "TVK": {
         "leader": "Vijay",
-        "image": "website/images/vijay.jpg"
+        "image": BASE_DIR / "website" / "images" / "vijay.jpg"
     },
     "DMK": {
         "leader": "M. K. Stalin",
-        "image": "website/images/stalin.jpg"
+        "image": BASE_DIR / "website" / "images" / "stalin.jpg"
     },
     "AIADMK": {
         "leader": "Edappadi K. Palaniswami",
-        "image": "website/images/eps.jpg"
+        "image": BASE_DIR / "website" / "images" / "eps.jpg"
     },
     "NTK": {
         "leader": "Seeman",
-        "image": "website/images/seeman.jpg"
+        "image": BASE_DIR / "website" / "images" / "seeman.jpg"
     }
 }
+
 
 all_wards = sorted(data["ward_no"].dropna().unique())
 
@@ -269,7 +280,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 
-# Updated party images with file checking
+# Party images with absolute path checking
 
 with st.container(key="poll_party_rows"):
 
@@ -285,17 +296,17 @@ with st.container(key="poll_party_rows"):
 
             image_path = party_leaders[party_name]["image"]
 
-            if os.path.isfile(image_path):
+            if image_path.is_file():
 
                 st.image(
-                    image_path,
+                    str(image_path),
                     width=100
                 )
 
             else:
 
                 st.error(
-                    "Image not found: " + image_path
+                    f"Image not found: {image_path}"
                 )
 
         with name_col:
@@ -513,9 +524,7 @@ if (
                     st.error(
                         "Verification connection error: " + str(e)
                     )
-
-
-# Vote submission after verification
+                    # Vote submission after verification
 
 phone_verified = (
     st.session_state["verified_phone"] == phone_e164
@@ -661,6 +670,8 @@ else:
     st.info(
         "Verify your mobile number before submitting your vote."
     )
+
+
 # Load public poll results
 
 st.write("## Four-Party Poll Comparison")
@@ -999,9 +1010,7 @@ except Exception as e:
     st.error(
         "Poll results error: " + str(e)
     )
-
-
-# Random Forest historical results
+    # Random Forest historical results
 
 st.divider()
 
@@ -1231,5 +1240,6 @@ if st.session_state.get("admin_logged_in", False):
 
         st.session_state["admin_logged_in"] = False
         st.rerun()
+
 
 st.divider()
